@@ -6,41 +6,22 @@ This project contains files related to the labs accompanying *Computer Systems: 
 
 ### Notes
 Deep-dive writeups for each lab.
-- 01 — [Data Lab](solutions/01_Data_lab/README.md)
-  Bit-level and floating-point ops in a restricted subset of C.
-- 02 — [Bomb Lab](solutions/02_Bomb_lab/README.md)
-  Reverse-engineer a binary to defuse it with a debugger.
-- 03 — [Attack Lab](solutions/03_Attack_lab/README.md)
-  Exploit buffer overflows via code injection and ROP.
-- 04 — [Architecture Lab](solutions/04_Archotecture_lab/)
-  Optimize Y86-64 code and a pipelined processor design.
-- 05 — [Cache Lab](solutions/05_Cache_lab/)
-  Build a cache simulator and tune a matrix transpose for misses.
-- 06 — [Performance Lab](solutions/06_Performance_lab/)
-  Optimize a kernel function to exploit cache locality.
-- 07 — [Shell Lab](solutions/07_Shell_lab/)
-  Write a Unix shell with job control, signals, and process control.
-- 08 — [Malloc Lab](solutions/08_Malloc_lab/README.md)
-  Implement malloc, free, and realloc with space/time trade-offs.
-- 09 — [Proxy Lab](solutions/09_Proxy_lab/README.md)
-  Build a concurrent caching web proxy.
+| # | Lab | Description | Done |
+|---|-----|-------------|:----:|
+| 01 | [Data Lab](solutions/01_Data_lab/README.md) | Bit and float puzzles in restricted C. | ✅ |
+| 02 | [Bomb Lab](solutions/02_Bomb_lab/README.md) | Defuse a binary by reading assembly. | ✅ |
+| 03 | [Attack Lab](solutions/03_Attack_lab/README.md) | Buffer-overflow exploits and ROP. | ✅ |
+| 04 | [Architecture Lab](solutions/04_Archotecture_lab/) | Optimize Y86-64 code and a pipelined CPU. | ➕ |
+| 05 | [Cache Lab](solutions/05_Cache_lab/) | Cache simulator and transpose tuning. | ✅ |
+| 06 | [Performance Lab](solutions/06_Performance_lab/) | Optimize a kernel for cache locality. | ➕ |
+| 07 | [Shell Lab](solutions/07_Shell_lab/) | A Unix shell with job control and signals. | ⬜ |
+| 08 | [Malloc Lab](solutions/08_Malloc_lab/README.md) | A custom malloc/free/realloc allocator. | ⬜ |
+| 09 | [Proxy Lab](solutions/09_Proxy_lab/README.md) | A concurrent caching web proxy. | ⬜ |
 
-### initial_labs
+➕ Saved for later. Not in the [CMU lectures](https://scs.hosted.panopto.com/Panopto/Pages/Sessions/List.aspx#folderID=%22b96d90ae-9871-4fae-91e2-b1627b43e25e%22).
+
+### [CMU 15-213 lectures](https://scs.hosted.panopto.com/Panopto/Pages/Sessions/List.aspx#folderID=%22b96d90ae-9871-4fae-91e2-b1627b43e25e%22)
 Original handout files. Also available from the [course page](http://csapp.cs.cmu.edu/3e/labs.html).
-
-## Lab Progress 
-
-- [x] [Data Lab]
-- [x] [Bomb Lab]
-- [x] [Attack Lab]
-- [x] [Cache Lab]
-- [ ] [Shell Lab]
-- [ ] [Malloc Lab]
-- [ ] [Proxy Lab]
-
-### Additional Labs
-- [ ] [Architecture Lab]
-- [ ] [Performance Lab]
 
 ### lab 1  [*Data Lab*](http://csapp.cs.cmu.edu/3e/datalab-handout.tar)
 
