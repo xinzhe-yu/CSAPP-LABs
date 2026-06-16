@@ -6,15 +6,15 @@ This project contains files related to the labs accompanying *Computer Systems: 
 
 ### Notes
 Deep-dive writeups for each lab.
-- Lab01 — Data Lab
-- Lab02 — Bomb Lab
-- Lab03 — Attack Lab
-- Lab04 — Architecture Lab
-- Lab05 — Cache Lab
-- Lab06 — Performance Lab
-- Lab07 — Shell Lab
-- Lab08 — Malloc Lab
-- Lab09 — Proxy Lab
+- Lab01 — [Data Lab] (
+- Lab02 — [Bomb Lab]
+- Lab03 — [Attack Lab]
+- Lab04 — [Architecture Lab]
+- Lab05 — [Cache Lab]
+- Lab06 — [Performance Lab]
+- Lab07 — [Shell Lab]
+- Lab08 — [Malloc Lab]
+- Lab09 — [Proxy Lab]
 
 ### initial_labs
 Original handout files. Also available from the [course page](http://csapp.cs.cmu.edu/3e/labs.html).
@@ -25,13 +25,13 @@ Original handout files. Also available from the [course page](http://csapp.cs.cm
 - [x] [Bomb Lab]
 - [x] [Attack Lab]
 - [x] [Cache Lab]
-- [] [Shell Lab]
-- [] [Malloc Lab]
-- [] [Proxy Lab]
+- [ ] [Shell Lab]
+- [ ] [Malloc Lab]
+- [ ] [Proxy Lab]
 
 ### Additional Labs
-- [] [Architecture Lab]
-- [] [Performance Lab]
+- [ ] [Architecture Lab]
+- [ ] [Performance Lab]
 
 ### lab 1  [*Data Lab*](http://csapp.cs.cmu.edu/3e/datalab-handout.tar)
 
