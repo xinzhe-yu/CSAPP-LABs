@@ -1,22 +1,30 @@
-## Tools & Techniques
-**GDB** — Dynamic analysis: breakpoints, stepping, 
-memory examination (x/), register inspection. 
-Used TUI mode (layout asm) for disassembly navigation.
+# Bomb Lab
 
-**Objdump** — Static analysis: symbol table (-t) to map 
-functions and data labels, disassembly (-d) to get 
-full binary overview.
+## Table of Contents
+- [Tools & Techniques](#tools--techniques)
+- [Phase 1 - String Comparison](#phase-1---string-comparison)
+- [Phase 2 - Doubling Sequence](#phase-2---doubling-sequence)
+- [Phase 3 - Switch Statement](#phase-3---switch-statement)
+- [Phase 4 - Recursive Binary Search](#phase-4---recursive-binary-search)
+- [Phase 5 - Lookup table](#phase-5---lookup-table)
+- [Phase 6 - Linked List Reordering](#phase-6---linked-list-reordering)
+- [Secret Phase - Binary Search Tree](#secret-phase---binary-search-tree)
+- [Answers.txt](#answerstxt)
+
+## Tools & Techniques
+
+| Tool | Role | Key usage |
+|---|---|---|
+| **GDB** | Dynamic analysis | breakpoints, stepping, memory examination (`x/`), register inspection; TUI mode (`layout asm`) for disassembly navigation |
+| **Objdump** | Static analysis | symbol table (`-t`) to map functions and data labels; disassembly (`-d`) to get full binary overview |
 
 **Key concepts applied:**
-- System V AMD64 calling convention (rdi, rsi, rdx, rcx, r8, r9)
-- Stack frame layout: prologue/epilogue, callee-saved registers, 
-  return addresses between frames
-- Recognizing compiler patterns: switch/jump tables, 
-  loop constructs, binary search, linked list traversal, 
-  binary tree recursion
-- sscanf return value checks for input validation
-- Stack canaries (fs:0x28)
-# Phase 1 - String Comparison
+- System V AMD64 calling convention (`rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`)
+- Stack frame layout: prologue/epilogue, callee-saved registers, return addresses between frames
+- Recognizing compiler patterns: switch/jump tables, loop constructs, binary search, linked list traversal, binary tree recursion
+- `sscanf` return value checks for input validation
+- Stack canaries (`fs:0x28`)
+## Phase 1 - String Comparison
 ### Main Puzzle Logic
 - Checks input with 0x402400
 - 0x402400 holds "Border relations with Canada have never been better."
@@ -33,7 +41,7 @@ full binary overview.
 ```
 ### Solution:
 - "Border relations with Canada have never been better."
-# Phase 2 - Six Numbers
+## Phase 2 - Doubling Sequence
 ### Main Puzzle Logic
 * `read_six_numbers` calls sscanf with "%d %d %d %d %d %d"
 * sscanf return value checked: must be > 5
@@ -77,7 +85,7 @@ full binary overview.
   400f41:       5d                      pop    rbp
   400f42:       c3                      ret
 ```
-# Phase 3 - Switch Statement
+## Phase 3 - Switch Statement
 ### Main Puzzle Logic
 * sscanf expects 2 items: "%d %d" at 0x4025cf
 * First input bounds check: `cmp [rsp+0x8], 0x7` / `ja` — must be 0-7
@@ -155,7 +163,7 @@ int phase_3(char *input) {
   400fc9:       48 83 c4 18             add    rsp,0x18
   400fcd:       c3                      ret
 ```
-# Phase 4
+## Phase 4 - Recursive Binary Search
 ### Main Puzzle Logic 
 * sscanf expects 2 items: "%d %d"
 * First input must be ≤ 14
@@ -218,7 +226,7 @@ int phase_3(char *input) {
   401061:       c3                      ret
 ```
 
-# Phase 5 - Lookup table
+## Phase 5 - Lookup table
 ### Main Puzzle Logic
 - Transform input 
 ``` c
@@ -274,7 +282,7 @@ for (int i = 0; i < 6; i++)
   4010f3:       c3                      ret
 ```
 
-# Phase 6 - Linked List Reordering
+## Phase 6 - Linked List Reordering
 ### Main Puzzle Logic
 * Block 1: Validates uniqueness and range (1-6)
 * Block 2: Transforms each number: `7 - input[i]`
@@ -386,8 +394,8 @@ for (int i = 0; i < 6; i++)
   401203:	c3                   	ret
 ```
 
-# Secret Phase - Recursive Binary Search
-## How to trigger it: 
+## Secret Phase - Binary Search Tree
+### How to trigger it: 
 `Phase_defused` checks if all previous phase has been completed (num_input_strings == 6), then re-parses phase_4's inputs with "%d %d %s" looking for the keyword "DrEvil".
 - Append "DrEvil" to phase 4 answer.  
 ### Main puzzle logic
@@ -534,7 +542,7 @@ int func7(node *current, int user_input) {
   40129f:	90                   	nop
 ```
 
-# Answers.txt
+## Answers.txt
 ```
 Border relations with Canada have never been better.
 1 2 4 8 16 32

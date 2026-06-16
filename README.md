@@ -6,15 +6,24 @@ This project contains files related to the labs accompanying *Computer Systems: 
 
 ### Notes
 Deep-dive writeups for each lab.
-- Lab01 — [Data Lab] (
-- Lab02 — [Bomb Lab]
-- Lab03 — [Attack Lab]
-- Lab04 — [Architecture Lab]
-- Lab05 — [Cache Lab]
-- Lab06 — [Performance Lab]
-- Lab07 — [Shell Lab]
-- Lab08 — [Malloc Lab]
-- Lab09 — [Proxy Lab]
+- 01 — [Data Lab](solutions/01_Data_lab/README.md)
+  Bit-level and floating-point ops in a restricted subset of C.
+- 02 — [Bomb Lab](solutions/02_Bomb_lab/README.md)
+  Reverse-engineer a binary to defuse it with a debugger.
+- 03 — [Attack Lab](solutions/03_Attack_lab/README.md)
+  Exploit buffer overflows via code injection and ROP.
+- 04 — [Architecture Lab](solutions/04_Archotecture_lab/)
+  Optimize Y86-64 code and a pipelined processor design.
+- 05 — [Cache Lab](solutions/05_Cache_lab/)
+  Build a cache simulator and tune a matrix transpose for misses.
+- 06 — [Performance Lab](solutions/06_Performance_lab/)
+  Optimize a kernel function to exploit cache locality.
+- 07 — [Shell Lab](solutions/07_Shell_lab/)
+  Write a Unix shell with job control, signals, and process control.
+- 08 — [Malloc Lab](solutions/08_Malloc_lab/README.md)
+  Implement malloc, free, and realloc with space/time trade-offs.
+- 09 — [Proxy Lab](solutions/09_Proxy_lab/README.md)
+  Build a concurrent caching web proxy.
 
 ### initial_labs
 Original handout files. Also available from the [course page](http://csapp.cs.cmu.edu/3e/labs.html).
