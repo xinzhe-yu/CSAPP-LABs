@@ -1,5 +1,5 @@
 # Bomb Lab
-Reverse engineer assembly
+x86-64 Reverse Engineering
 ## Table of Contents
 - [Phase 1 - String Comparison](#phase-1---string-comparison)
 - [Phase 2 - Doubling Sequence](#phase-2---doubling-sequence)
