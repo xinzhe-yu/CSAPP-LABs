@@ -1,7 +1,6 @@
 # Bomb Lab
 
 ## Table of Contents
-- [Tools & Techniques](#tools--techniques)
 - [Phase 1 - String Comparison](#phase-1---string-comparison)
 - [Phase 2 - Doubling Sequence](#phase-2---doubling-sequence)
 - [Phase 3 - Switch Statement](#phase-3---switch-statement)
@@ -11,19 +10,6 @@
 - [Secret Phase - Binary Search Tree](#secret-phase---binary-search-tree)
 - [Answers.txt](#answerstxt)
 
-## Tools & Techniques
-
-| Tool | Role | Key usage |
-|---|---|---|
-| **GDB** | Dynamic analysis | breakpoints, stepping, memory examination (`x/`), register inspection; TUI mode (`layout asm`) for disassembly navigation |
-| **Objdump** | Static analysis | symbol table (`-t`) to map functions and data labels; disassembly (`-d`) to get full binary overview |
-
-**Key concepts applied:**
-- System V AMD64 calling convention (`rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`)
-- Stack frame layout: prologue/epilogue, callee-saved registers, return addresses between frames
-- Recognizing compiler patterns: switch/jump tables, loop constructs, binary search, linked list traversal, binary tree recursion
-- `sscanf` return value checks for input validation
-- Stack canaries (`fs:0x28`)
 ## Phase 1 - String Comparison
 ### Main Puzzle Logic
 - Checks input with 0x402400
