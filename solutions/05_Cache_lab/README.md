@@ -31,3 +31,31 @@ On access, the set index selects a set, tags are compared in parallel against th
 Passes all eight test cases for full credit (27/27). Hit, miss, and eviction counts match the reference simulator exactly across every parameter configuration.
 
 # Part B 
+
+This part requires transposing an N×M matrix into its M×N form while minimizing the number of misses incurred against a simulated direct-mapped cache.
+
+## Constraints
+
+The transpose runs against a fixed cache: **s = 5, E = 1, b = 5**. That means 2^5 = 32 sets, one line per set (direct-mapped), and 2^5 = 32 bytes per block. Each block holds 32 / 4 = **8 ints**, and the whole cache holds 32 × 32 = 1024 bytes = **256 ints (8 full rows of a 32-wide matrix)**. Because E = 1, any two addresses whose set indices collide evict each other immediately — there is no associativity to absorb conflicts.
+
+Two consequences drive the whole solution:
+
+- **The source and destination alias.** `A[i][j]` and `B[j][i]` often land in the same set, so reading from `A` can evict the block of `B` you are about to write (and vice versa). The diagonal blocks are the worst case for this.
+- **Only 256 ints fit at once.** For the 32×32 case, rows that are 8 apart map to the same set, so naive row-by-row access thrashes.
+
+The other hard rule: the function may use **at most 12 local variables** (no arrays, no recursion, no helper-function workarounds for storage). This is just enough to hold a handful of loop indices plus the 8 ints of a single block — which is exactly the technique used to break the A/B aliasing on the diagonal: read a full block out of `A` into locals, then write it into `B`, so the read and write phases never fight over the same cache line.
+
+The standard approach is **blocking**: process the matrix in sub-tiles sized to the cache (8×8 for the 32×32 case, with a 4×4 / mixed scheme for 64×64 where only 4 rows fit per set before aliasing), copying via local variables to avoid evicting a block before it is fully consumed.
+
+## My Method
+
+**32×32 and 64×64 (the blocking cases):** In both I tile the matrix into 8×8 blocks and stage data through 8 local registers (`t0`–`t7`) so that I read a full cache line out of `A` and write it into `B` without the two arrays evicting each other mid-block. For 32×32 a plain 8×8 copy is enough, since 8 rows span exactly the cache's 256-int capacity and each `A` block stays resident while it is transposed. For 64×64 I still block by 8×8, but a straight transpose within the block fails because a 64-wide row means rows only 4 apart collide in the same set, so I split each block into 4×4 quadrants and run a three-step pass: first I read the top half of `A` and write the top-left quadrant straight into `B`, while *staging* the top-right quadrant's data into the wrong-but-cached top-right corner of `B`; then I come back, read that staged data out of `B` into registers and pull in `A`'s bottom-left quadrant at the same time, writing both into their correct final positions; finally I transpose the bottom-right quadrant normally. The staging step is the trick — it parks data in a still-cached part of `B` so I never have to re-read a line of `A` that's already been evicted by aliasing.
+
+**61×67 (the prime case):** Here the boundaries can't be blocked cleanly — but they don't need to be. Because 61 and 67 are prime (and not multiples of 8 or aligned to the set count), successive rows don't wrap onto the same set the way the power-of-two dimensions do; the row stride no longer maps consecutive rows onto identical set indices, so the pathological conflict misses that plague 32×32 and 64×64 simply don't occur. A coarse, simple block (17×17 tiles) therefore lands under the miss threshold with no special-casing.
+
+**Why blocking changes efficiency:** Blocking only buys anything when there is a conflict/capacity problem to solve — it forces each block to be fully consumed while it is still cached, before it gets evicted. With the prime dimensions the cache mapping is naturally spread out, eviction isn't fighting you, and the tile size barely matters. With power-of-two widths the mapping is adversarial: the same handful of sets get hammered, so the entire point of blocking (plus the register staging) is to control exactly which lines are live and consume each one completely before the cache is forced to throw it away.
+
+## Implementation
+
+[`trans.c`](https://github.com/you/repo/blob/main/trans.c) — blocked matrix transpose (8×8 tiling for 32×32, 4×4 quadrant staging for 64×64, 17×17 tiles for 61×67).
+
