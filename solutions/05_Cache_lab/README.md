@@ -22,7 +22,7 @@ On access, the set index selects a set, tags are compared in parallel against th
 
 ## Implementation
 
-[`csim.c`](https://github.com/you/repo/blob/main/csim.c) — set-associative cache simulator (S/E/B configurable).
+[`csim.c`](../../Labs/cachelab-handout/cachelab-handout/csim.c) — set-associative cache simulator (S/E/B configurable).
 
 ## Result
 
@@ -43,7 +43,7 @@ Two consequences drive the whole solution:
 - **The source and destination alias.** `A[i][j]` and `B[j][i]` often land in the same set, so reading from `A` can evict the block of `B` you are about to write (and vice versa). The diagonal blocks are the worst case for this.
 - **Only 256 ints fit at once.** For the 32×32 case, rows that are 8 apart map to the same set, so naive row-by-row access thrashes.
 
-The other hard rule: the function may use **at most 12 local variables** (no arrays, no recursion, no helper-function workarounds for storage). This is just enough to hold a handful of loop indices plus the 8 ints of a single block — which is exactly the technique used to break the A/B aliasing on the diagonal: read a full block out of `A` into locals, then write it into `B`, so the read and write phases never fight over the same cache line.
+The other hard rule: the function may use **at most 12 local variables** (no arrays, no recursion, no helper-function workarounds for storage). This is just enough to hold a handful of loop indices plus the 8 ints of a single block, which is exactly the technique used to break the A/B aliasing on the diagonal: read a full block out of `A` into locals, then write it into `B`, so the read and write phases never fight over the same cache line.
 
 The standard approach is **blocking**: process the matrix in sub-tiles sized to the cache (8×8 for the 32×32 case, with a 4×4 / mixed scheme for 64×64 where only 4 rows fit per set before aliasing), copying via local variables to avoid evicting a block before it is fully consumed.
 
@@ -57,5 +57,6 @@ The standard approach is **blocking**: process the matrix in sub-tiles sized to 
 
 ## Implementation
 
-[`trans.c`](https://github.com/you/repo/blob/main/trans.c) — blocked matrix transpose (8×8 tiling for 32×32, 4×4 quadrant staging for 64×64, 17×17 tiles for 61×67).
+[`trans.c`](../../Labs/cachelab-handout/cachelab-handout/trans.c) — blocked matrix transpose (8×8 tiling for 32×32, 4×4 quadrant staging for 64×64, 17×17 tiles for 61×67).
 
+![alt text]({CAAB8558-C2FB-4306-84A5-43CE16330292}.png)

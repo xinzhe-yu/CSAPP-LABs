@@ -12,7 +12,7 @@ Deep-dive writeups for each lab.
 | 02 | [Bomb Lab](solutions/02_Bomb_lab/README.md) | Defuse a binary by reading assembly. | ✅ |
 | 03 | [Attack Lab](solutions/03_Attack_lab/README.md) | Buffer-overflow exploits and ROP. | ✅ |
 | 04 | [Architecture Lab](solutions/04_Archotecture_lab/) | Optimize Y86-64 code and a pipelined CPU. | ➕ |
-| 05 | [Cache Lab](solutions/05_Cache_lab/) | Cache simulator and transpose tuning. | ✅ |
+| 05 | [Cache Lab](solutions/05_Cache_lab/README.md) | Cache simulator and transpose tuning. | ✅ |
 | 06 | [Performance Lab](solutions/06_Performance_lab/) | Optimize a kernel for cache locality. | ➕ |
 | 07 | [Shell Lab](solutions/07_Shell_lab/) | A Unix shell with job control and signals. | ⬜ |
 | 08 | [Malloc Lab](solutions/08_Malloc_lab/README.md) | A custom malloc/free/realloc allocator. | ⬜ |
