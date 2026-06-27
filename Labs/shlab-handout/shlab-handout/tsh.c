@@ -79,6 +79,9 @@ struct job_t *getjobjid(struct job_t *jobs, int jid);
 int pid2jid(pid_t pid); 
 void listjobs(struct job_t *jobs);
 
+/* My helpers */
+
+
 void usage(void);
 void unix_error(char *msg);
 void app_error(char *msg);
@@ -131,23 +134,23 @@ int main(int argc, char **argv)
     /* Execute the shell's read/eval loop */
     while (1) {
 
-	/* Read command line */
-	if (emit_prompt) {
-	    printf("%s", prompt);
-	    fflush(stdout);
-	}
-	if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
-	    app_error("fgets error");
-	if (feof(stdin)) { /* End of file (ctrl-d) */
-	    fflush(stdout);
-	    exit(0);
-	}
+        /* Read command line */
+        if (emit_prompt) {
+            printf("%s", prompt);
+            fflush(stdout);
+        }
+        if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+            app_error("fgets error");
+        if (feof(stdin)) { /* End of file (ctrl-d) */
+            fflush(stdout);
+            exit(0);
+        }
 
-	/* Evaluate the command line */
-	eval(cmdline);
-	fflush(stdout);
-	fflush(stdout);
-    } 
+        /* Evaluate the command line */
+        eval(cmdline);
+        fflush(stdout);
+        fflush(stdout);
+    }
 
     exit(0); /* control never reaches here */
 }
@@ -165,6 +168,16 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
+    int bg; 
+    char *argv[MAXARGS];
+
+    bg = parseline(cmdline, argv);
+
+    if (!builtin_cmd(argv)) {
+        //fork 
+    }
+
+
     return;
 }
 
@@ -189,6 +202,8 @@ int parseline(const char *cmdline, char **argv)
 	buf++;
 
     /* Build the argv list */
+    // /bin/echo 'hello world' 
+    // Group tokens 
     argc = 0;
     if (*buf == '\'') {
 	buf++;
@@ -199,19 +214,19 @@ int parseline(const char *cmdline, char **argv)
     }
 
     while (delim) {
-	argv[argc++] = buf;
-	*delim = '\0';
-	buf = delim + 1;
-	while (*buf && (*buf == ' ')) /* ignore spaces */
-	       buf++;
+        argv[argc++] = buf;
+        *delim = '\0';
+        buf = delim + 1;
+        while (*buf && (*buf == ' ')) /* ignore spaces */
+            buf++;
 
-	if (*buf == '\'') {
-	    buf++;
-	    delim = strchr(buf, '\'');
-	}
-	else {
-	    delim = strchr(buf, ' ');
-	}
+        if (*buf == '\'') {
+            buf++;
+            delim = strchr(buf, '\'');
+        }
+        else {
+            delim = strchr(buf, ' ');
+        }
     }
     argv[argc] = NULL;
     
@@ -228,9 +243,29 @@ int parseline(const char *cmdline, char **argv)
 /* 
  * builtin_cmd - If the user has typed a built-in command then execute
  *    it immediately.  
+ * Return true if it is a builtin cmd, false if not. 
  */
 int builtin_cmd(char **argv) 
 {
+    if (strcmp(argv[0], "quit") == 0) {
+        if (kill(getpid(), 3) < 0) {
+            unix_error("Quit failed");
+        }
+        return 1;
+
+    } else if (strcmp(argv[0], "jobs") == 0) {
+        listjobs(jobs);
+        return 1;
+
+    } else if (strcmp(argv[0], "fg") == 0) {
+        do_bgfg(argv);
+        return 1;
+
+    } else if (strcmp(argv[0], "bg") == 0) {
+        do_bgfg(argv);
+        return 1;
+
+    }
     return 0;     /* not a builtin command */
 }
 
@@ -238,7 +273,41 @@ int builtin_cmd(char **argv)
  * do_bgfg - Execute the builtin bg and fg commands
  */
 void do_bgfg(char **argv) 
-{
+{   
+    int pid;
+    char *buf = *argv[1];
+    if (*buf && (*buf == '%')) { /* check for %jid */
+        buf++;
+        // convert jid to pid 
+        int tmp = atoi(buf);
+        struct job_t *current = getjobjid(jobs, tmp);
+        pid = current->pid;
+    } else {
+        pid = atoi(buf);
+    }
+    
+    if (strcmp(argv[0], "fg") == 0) { /* Foregorund */
+        pid_t fgid = fgpid(jobs);
+        if (!fgid) { /* Foreground occupied */
+            fprintf(stdout, "Foreground occupied");
+            return;
+        }
+        // update state
+        struct job_t *current = getjobpid(jobs, pid);
+        if (current->state == ST || current->state == BG) {
+            current->state = FG;
+        }
+        kill(SIGCONT, -pid);
+        waitfg(pid);
+
+    } else if (strcmp(argv[0], "bg") == 0) { /* Background */
+
+        struct job_t *current = getjobpid(jobs, pid);
+        if (current->state == ST) {
+            current->state = BG;
+        }
+        kill(SIGCONT, -pid);
+    }
     return;
 }
 
