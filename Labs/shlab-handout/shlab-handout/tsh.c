@@ -177,23 +177,31 @@ void eval(char *cmdline)
 
     bg = parseline(cmdline, argv);
 
+    // for (int i = 0; argv[i] != NULL ; i++) {
+    //     fprintf(stdout, "%d: %s\n", i, argv[i]);
+    // }
+
     if (!builtin_cmd(argv)) {
         sigprocmask(SIG_BLOCK, &mask, &prev); /* Block SIGCHLD */
         pid_t pid = fork();
-        if (fork() < 0) { unix_error("Fork error"); }
+        if (pid < 0) { unix_error("Fork error"); }
 
         if (pid == 0) { /* Child process */
+            sigprocmask(SIG_SETMASK, &prev, NULL); /* Unblock SIGCHLD */
             setpgid(0, 0); /* Unique pgid */
-            execv(argv[0], &argv[1]);
-            unix_error("execv failed");
+            execv(argv[0], argv);
+            printf("%s: Command not found\n", argv[0]);
+            //unix_error("execv failed");
             /* exits */
+            exit(EXIT_SUCCESS);
         }
 
-        if (!bg) { /* Wait for fg */
+        if (!bg) { /* fg waitfg */
             addjob(jobs, pid, FG, cmdline);
             waitfg(pid);
-        } else {
-            addjob(jobs, pid, BG, cmdline);
+        } else { /* background */
+            addjob(jobs, pid, BG, cmdline); 
+            printf("[%d] (%d) %s", pid2jid(pid), pid, cmdline);
         }
         sigprocmask(SIG_SETMASK, &prev, NULL); /* Unblock SIGCHLD */
 
@@ -257,6 +265,11 @@ int parseline(const char *cmdline, char **argv)
     if ((bg = (*argv[argc-1] == '&')) != 0) {
 	argv[--argc] = NULL;
     }
+
+    // for (int i = 0; argv[i] != NULL ; i++) {
+    //     fprintf(stdout, "%d: %s\n", i, argv[i]);
+    // }
+
     return bg;
 }
 
@@ -268,9 +281,7 @@ int parseline(const char *cmdline, char **argv)
 int builtin_cmd(char **argv) 
 {
     if (strcmp(argv[0], "quit") == 0) {
-        if (kill(getpid(), SIGQUIT) < 0) {
-            unix_error("Quit failed");
-        }
+        exit(EXIT_SUCCESS);
         return 1;
 
     } else if (strcmp(argv[0], "jobs") == 0) {
@@ -302,7 +313,7 @@ void do_bgfg(char **argv)
         int tmp = atoi(buf);
         struct job_t *current = getjobjid(jobs, tmp);
         if (current == NULL) {
-            fprintf(stdout, "%s(jid): No such job\n", buf);
+            fprintf(stdout, "%%%s: No such job\n", buf);
             return; 
         }
         pid = current->pid;
@@ -503,8 +514,9 @@ int addjob(struct job_t *jobs, pid_t pid, int state, char *cmdline)
 {
     int i;
     
-    if (pid < 1)
-	return 0;
+    if (pid < 1) {
+        return 0;
+    }
 
     for (i = 0; i < MAXJOBS; i++) {
 	if (jobs[i].pid == 0) {
