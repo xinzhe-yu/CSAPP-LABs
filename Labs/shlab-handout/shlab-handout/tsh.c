@@ -300,7 +300,7 @@ int builtin_cmd(char **argv)
 void do_bgfg(char **argv) 
 {   
     if (argv[1] == NULL) { /* parselines makes argv null terminated */
-        fprintf(stdout, "fg command requires PID or %%jobid argument\n");
+        fprintf(stdout, "%s command requires PID or %%jobid argument\n", argv[0]);
         return; 
     }
 
@@ -377,6 +377,8 @@ void do_bgfg(char **argv)
         if (kill(-pid, SIGCONT) < 0) { /* Request to continue */
             unix_error("kill failed");
         }
+        fprintf(stdout, "[%d] (%d) %s", pid2jid(pid), pid, current->cmdline);
+
     }
     return;
 }
@@ -409,7 +411,6 @@ void waitfg(pid_t pid)
 void sigchld_handler(int sig) 
 {
     int olderrno = errno;
-    //do i need to make sure this does not get interrupted by other signals?
     sigset_t allmask, prev; 
     sigfillset(&allmask);
     sigprocmask(SIG_SETMASK, &allmask, &prev);
