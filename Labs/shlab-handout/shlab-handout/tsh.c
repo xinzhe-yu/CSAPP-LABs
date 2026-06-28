@@ -409,6 +409,7 @@ void sigchld_handler(int sig)
             }
         } else if (WIFSIGNALED(status)) { /* CTRL-C Terminated */
             deletejob(jobs, pid);
+            fprintf(stdout, "Job [%d] (%d) terminated by signal %d", pid2jid(pid), pid, WTERMSIG(status));
         }
     }
 
