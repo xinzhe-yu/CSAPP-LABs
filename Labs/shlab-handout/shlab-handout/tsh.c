@@ -323,8 +323,9 @@ void do_bgfg(char **argv)
     
     if (strcmp(argv[0], "fg") == 0) { /* Foregorund */
         pid_t fgid = fgpid(jobs);
-        if (!fgid) { /* Foreground occupied */
-            fprintf(stdout, "Foreground occupied");
+
+        if (fgid) { /* Foreground occupied */
+            fprintf(stdout, "Foreground occupied\n");
             return;
         }
         // update state
