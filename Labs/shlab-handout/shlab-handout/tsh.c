@@ -80,9 +80,6 @@ struct job_t *getjobjid(struct job_t *jobs, int jid);
 int pid2jid(pid_t pid); 
 void listjobs(struct job_t *jobs);
 
-/* My helpers */
-
-
 void usage(void);
 void unix_error(char *msg);
 void app_error(char *msg);
@@ -260,10 +257,6 @@ int parseline(const char *cmdline, char **argv)
 	argv[--argc] = NULL;
     }
 
-    // for (int i = 0; argv[i] != NULL ; i++) {
-    //     fprintf(stdout, "%d: %s\n", i, argv[i]);
-    // }
-
     return bg;
 }
 
@@ -303,13 +296,9 @@ void do_bgfg(char **argv)
         fprintf(stdout, "%s command requires PID or %%jobid argument\n", argv[0]);
         return; 
     }
-
+    
     int pid;
     char *buf = argv[1];
-
-    // 1. Check argument is non empty (Done)
-    // 2. Check argument is a int 
-    // 3. check argument is valid process 
 
     if (*buf && (*buf == '%')) { /* Parse % for jid */
         buf++;
@@ -347,20 +336,20 @@ void do_bgfg(char **argv)
         }
     }
 
-    if (strcmp(argv[0], "fg") == 0) { /* Foregorund */
+    if (strcmp(argv[0], "fg") == 0) { /* Foreground */
         pid_t fgid = fgpid(jobs);
 
         if (fgid) { /* Foreground occupied */
             fprintf(stdout, "Foreground occupied\n");
             return;
         }
-        // update state
-        struct job_t *current = getjobpid(jobs, pid);
+
+        struct job_t *current = getjobpid(jobs, pid); 
         if (!current) {
             fprintf(stdout, "%d No such job\n", pid);
             return; 
         }
-        if (current->state == ST || current->state == BG) {
+        if (current->state == ST || current->state == BG) { /* update state */
             current->state = FG;
         }
         if (kill(-pid, SIGCONT) < 0) { /* Request to continue */
