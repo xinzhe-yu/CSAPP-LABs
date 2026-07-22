@@ -55,6 +55,7 @@ team_t team = {
 /* Read nad write a word at address p */
 #define GET(p) (*(unsigned int *) (p))
 #define PUT(p, val) (*(unsigned int *) (p) = (val))
+#define PUT_PTR(p, ptr) (*(long int)(p) = val) 
 
 /* Read the size and allocated fields from address p*/
 #define GET_SIZE(p) (GET(p) & ~0x7)
@@ -69,22 +70,30 @@ team_t team = {
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 /* Global variables */
-static char *heap_listp = 0;   /* pointer to first block (the prologue) */
+static char *heap_listp = NULL;   /* pointer to data structure | free list heads | Prolouge header | ... */
 
 /* 
  * mm_init - initialize the malloc package.
  */
 int mm_init(void) {
     /* Create the initial empty heap */
-    if ((heap_listp = mem_sbrk(8*WSIZE)) == (void *)-1) {
-        return -1;
-    }
-        
-    PUT(heap_listp, 0); /* Alignment padding */
-    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
-    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
-    PUT(heap_listp + (3*WSIZE), PACK(0, 1)); /* Epilogue header */
-    heap_listp += (2*WSIZE);
+    if ((heap_listp = mem_sbrk(22*WSIZE)) == (void *)-1) { return -1; }
+    
+    // Size class heads
+    PUT(heap_listp + (0*WSIZE), NULL); // [24-31]
+    PUT(heap_listp + (2*WSIZE), NULL); // [32-63]
+    PUT(heap_listp + (4*WSIZE), NULL); // [64-127]
+    PUT(heap_listp + (6*WSIZE), NULL); // [128-255]
+    PUT(heap_listp + (8*WSIZE), NULL); // [256-511]
+    PUT(heap_listp + (10*WSIZE), NULL); // [512-1023]
+    PUT(heap_listp + (12*WSIZE), NULL); // [1024-2047]
+    PUT(heap_listp + (14*WSIZE), NULL); // [2048-4095]
+    PUT(heap_listp + (16*WSIZE), NULL); // [4096-inf]  
+    PUT(heap_listp + (18*WSIZE), 0);              /* Alignment padding */
+    PUT(heap_listp + (19*WSIZE), PACK(DSIZE, 1)); /* Prologue header */
+    PUT(heap_listp + (20*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
+    PUT(heap_listp + (21*WSIZE), PACK(0, 1));     /* Epilogue header */
+     
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) { // 1024
