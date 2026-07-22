@@ -40,7 +40,6 @@ team_t team = {
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
-
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 /* Basic constants and macros*/
@@ -75,8 +74,7 @@ static char *heap_listp = 0;   /* pointer to first block (the prologue) */
 /* 
  * mm_init - initialize the malloc package.
  */
-int mm_init(void)
-{
+int mm_init(void) {
     /* Create the initial empty heap */
     if ((heap_listp = mem_sbrk(8*WSIZE)) == (void *)-1) {
         return -1;
@@ -95,8 +93,7 @@ int mm_init(void)
     return 0;
 }
 
-static void *extend_heap(size_t words)
-{
+static void *extend_heap(size_t words) {
     char *bp;
     size_t size;
 
@@ -120,30 +117,25 @@ static void *extend_heap(size_t words)
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-void *mm_malloc(size_t size)
-{
+void *mm_malloc(size_t size) {
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
     char *bp;
 
-    /* Ignore spurious requests */
-    if (size == 0)
+    if (size == 0) /* Ignore spurious requests */
         return NULL;
-
-    /* Adjust block size to include overhead and alignment reqs. */
-    if (size <= DSIZE)
+    
+    if (size <= DSIZE) /* Adjust block size to include overhead and alignment reqs. */
         asize = 2*DSIZE;
     else
         asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
 
-    /* Search the free list for a fit */
-    if ((bp = find_fit(asize)) != NULL) {
+    if ((bp = find_fit(asize)) != NULL) { /* Search the free list for a fit */
         place(bp, asize);
         return bp;
     }
 
-    /* No fit found. Get more memory and place the block */
-    extendsize = MAX(asize, CHUNKSIZE);
+    extendsize = MAX(asize, CHUNKSIZE); /* No fit found. Get more memory and place the block */
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
         return NULL;
     place(bp, asize);
@@ -153,8 +145,7 @@ void *mm_malloc(size_t size)
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *bp)
-{
+void mm_free(void *bp) {
     size_t size = GET_SIZE(HDRP(bp));
 
     PUT(HDRP(bp), PACK(size, 0));
@@ -162,8 +153,7 @@ void mm_free(void *bp)
     coalesce(bp);
 }
 
-static void *coalesce(void *bp)
-{
+static void *coalesce(void *bp) {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
@@ -232,8 +222,7 @@ static void *coalesce(void *bp)
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size)
-{
+void *mm_realloc(void *ptr, size_t size) {
     void *oldptr = ptr;
     void *newptr;
     size_t copySize;
