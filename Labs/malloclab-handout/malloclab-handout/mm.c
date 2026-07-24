@@ -76,8 +76,13 @@ team_t team = {
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
+// Given a block ptr bp, access prev or next linked free block
+#define PREV(bp) (*((char **)bp))
+#define NEXT(bp) (*((char **)(((char *)(bp)) + DSIZE)))
+
+
 // Returns address of block, land at the first block 
-#define HEADLIST(index) *((char **)((char *)heap_listp + (index * DSIZE)))
+#define HEADLIST(index) (*((char **)((char *)heap_listp + (index * DSIZE))))
 // Global variables
 static char *heap_listp = NULL;   // pointer to data structure | free list heads | Prolouge header | ...
 
@@ -99,7 +104,7 @@ int mm_init(void) {
     PUT(heap_listp + (18*WSIZE), 0);              // Alignment padding
     PUT(heap_listp + (19*WSIZE), PACK(DSIZE, 1, 1)); // Prologue header
     PUT(heap_listp + (20*WSIZE), PACK(DSIZE, 1, 1)); // Prologue footer
-    PUT(heap_listp + (21*WSIZE), PACK(0, 0, 1));     // Epilogue header
+    PUT(heap_listp + (21*WSIZE), PACK(0, 1, 1));     // Epilogue header
     
 
     return 0;
@@ -179,7 +184,7 @@ void *mm_malloc(size_t size) {
 // find free block
 // returns pointer to the block 
 // maybe do some state updates?
-static void* find_block(size_t class_index, size_t blocksize) {
+static void* find_block(size_t class_index, size_t asize) {
     char *bp;
     bp = HEADLIST(class_index); //lands at first block
 
@@ -187,7 +192,7 @@ static void* find_block(size_t class_index, size_t blocksize) {
         if (class_index < 8) {  //not last size
             bp = HEADLIST(class_index + 1); //increment class index
         } else { // all class NULL, allocate block and return
-            size_t extend_size = MAX(blocksize, CHUNKSIZE);
+            size_t extend_size = MAX(asize, CHUNKSIZE);
             if ((bp = extend_heap(extend_size/WSIZE)) == NULL) {
                 return NULL; //error handle?
             } else { //no error
@@ -196,7 +201,7 @@ static void* find_block(size_t class_index, size_t blocksize) {
         }
     }
     // iterate inside one class to find the free block
-    while (!((!(GET_ALLOC(HDRP(bp)))) && (GET_SIZE(HDRP(bp)) >= blocksize))) { // == needs to change?
+    while (!((!(GET_ALLOC(HDRP(bp)))) && (GET_SIZE(HDRP(bp)) >= asize))) { // == needs to change?
         //go next 
         bp = *((char *)bp + DSIZE); //bp=bp->next
         if (bp == NULL) { // what if we reach end?
@@ -204,7 +209,7 @@ static void* find_block(size_t class_index, size_t blocksize) {
             if (class_index < 8) {  //not last size
             bp = HEADLIST(class_index + 1); //increment class index
             } else { // all class exhausted, allocate block and return
-                size_t extend_size = MAX(blocksize, CHUNKSIZE);
+                size_t extend_size = MAX(asize, CHUNKSIZE);
                 if ((bp = extend_heap(extend_size/WSIZE)) == NULL) {
                     return NULL; //error handle?
                 } else { //no error
@@ -212,41 +217,95 @@ static void* find_block(size_t class_index, size_t blocksize) {
                 }
             }
         }
-        
     } 
     // found 
-    // split
-    bp = split(bp, blocksize);
-
-    // update curr and next bits
+    // test for split
+    size_t csize = GET_SIZE(HDRP(bp)); // block size of 
+    size_t diff = csize - asize; // size always >= asize
+    if ((diff >= MINBLOCKSIZE)) {
+        // split. Next contiguous = fragment 
+        split(bp, asize);
+    } else {
+        // set next block's prev bits. Next contiguous block = next contiguous block
+        SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
+    }
+    
+    // update curr bits
     SET_ALLOC(HDRP(bp));
-    // got to next block and set next's prev
-    SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
-    // relink data structure
-    //bp->prev->next = bp->next;
-    PUT_PTR(((*bp) + DSIZE), *(bp + DSIZE));
-    //bp->next->prev = bp->prev;
-    PUT_PTR((*((bp) + DSIZE)), (*bp));
-    //bp->prev = null; // is this optional? leave as garbage
-    PUT_PTR(bp, NULL);
-    //bp->next = null;
-    PUT_PTR((bp + DSIZE), NULL);
-    // clear garbage pointers 
-    // return
+    SET_ALLOC(FTRP(bp));
+
+    // remove the block from free list
+    list_remove(bp);
     return bp; //bp read
 }
 
 // split extra block and place fragment in appropriate size class
-// return useable partion of block
-static void* split(char *bp, size_t blocksize) {
-    // check if it needs splitting
-    size_t size = GET_SIZE(HRDP(bp));
-    size_t diff = size - blocksize; // unsigned problem 
-    if (!(diff < MINBLOCKSIZE)) {
-        // split 
-        bp = split(bp, blocksize);
+static void split(char *bp, size_t asize) {
+    // split any surplus of 24+ 
+    char *frag_bp = bp + asize;
+    size_t csize = GET_SIZE(HDRP(bp));
+    size_t frag_size = csize - asize;
+   
+    // Pack headers/footers
+    // Being allocated block - no footer
+    PUT(HDRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
+    //PUT(FTRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
+
+    // Free block / set next block's prev bits
+    PUT(HDRP(frag_bp), PACK(frag_size, 1, 0)); 
+    PUT(FTRP(frag_bp), PACK(frag_size, 1, 0));
+
+    // Insert frag to new list
+    list_insert(frag_bp);
+}
+
+// Insert policy for free block
+// Find and inserts free block into data structure
+static void list_insert(char *bp) { // LIFO
+    // take a free block
+    // insert at beginning
+    size_t index = find_sizeclass(GET_SIZE(HDRP(bp)));
+    char *first = HEADLIST(index); //lands first block
+
+    HEADLIST(index) = bp; // LIFO 
+    PREV(bp) = NULL;
+
+    if (first == NULL) { // If size class was empty 
+        NEXT(bp) = NULL; // bp->Next = 0;
+    } else {
+        NEXT(bp) = first;
+        PREV(first) = bp;
     }
-    if (blocksize < 24)
+}
+
+// remove a block from data structure, relink
+// remove addr pointing to this block 
+static void list_remove(char *bp) {
+    char *prev_p = PREV(bp); // land on block bp or Null
+    char *next_p = NEXT(bp); // land on block bp or Null
+    size_t index = find_sizeclass(GET_SIZE(HDRP(bp)));
+    // Case 1 prev null, next null
+    if (!prev_p && !next_p) {
+        HEADLIST(index) = NULL; // head->next null
+    }
+    // Case 2 prev 1, next null
+    else if (prev_p && !next_p) {
+        NEXT(PREV(bp)) = NULL; //bp->prev->next = Null;
+    }
+    // Case 3 prev null, next 1;
+    else if (!prev_p && next_p) {
+         // head->next = bp->next;
+        HEADLIST(index) = NEXT(bp);
+        // bp->next->prev = NULL;
+        PREV(NEXT(bp)) = NULL;
+    }
+    // Case 4 prev 1, next 1
+    else if (prev_p && next_p) {
+        // bp->prev->next = bp->next;
+        NEXT(PREV(bp)) = NEXT(bp);
+        // bp->next->prev = bp->prev
+        PREV(NEXT(bp)) = PREV(bp);
+    }
 }
 
 
@@ -292,7 +351,7 @@ static void *coalesce(void *bp) {
     // Not allocated = Footer
     size_t prev_alloc = PRE_IS_ALLOC(bp);
     size_t next_alloc = NEXT_IS_ALLOC(bp);
-    size_t size = GET_SIZE(HDRP(bp));
+    size_t csize = GET_SIZE(HDRP(bp));
 
     if (prev_alloc && next_alloc) {            // Case 1
         return bp;
@@ -309,17 +368,17 @@ static void *coalesce(void *bp) {
         PUT(NEXT_BLKP(bp), NULL);
         PUT((NEXT_BLKP(bp) + DSIZE), NULL);
 
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(bp), PACK(size, 0));
+        csize += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        PUT(HDRP(bp), PACK(csize, 0));
+        PUT(FTRP(bp), PACK(csize, 0));
     }
 
     else if (!prev_alloc && next_alloc) {      // Case 3 // prev free is unchanged
         //verified
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        csize += GET_SIZE(HDRP(PREV_BLKP(bp)));
         int succ_prev_alloc = GET_PRE_ALLOC((HDRP(PREV_BLKP(bp)))); // Get succ states
-        PUT(FTRP(bp), PACK(size, succ_prev_alloc, 0));              // new size + old state
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, succ_prev_alloc, 0));
+        PUT(FTRP(bp), PACK(csize, succ_prev_alloc, 0));              // new size + old state
+        PUT(HDRP(PREV_BLKP(bp)), PACK(csize, succ_prev_alloc, 0));
         bp = PREV_BLKP(bp);
     }
 
@@ -334,10 +393,10 @@ static void *coalesce(void *bp) {
         PUT(NEXT_BLKP(bp) + DSIZE, NULL);
         PUT(NEXT_BLKP(bp), NULL);
 
-        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
+        csize += GET_SIZE(HDRP(PREV_BLKP(bp))) +
                 GET_SIZE(FTRP(NEXT_BLKP(bp)));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(csize, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(csize, 0));
 
         // Bp still in middle
 
