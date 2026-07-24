@@ -33,6 +33,8 @@ team_t team = {
     ""
 };
 
+#define SIZECLASSCOUNT 8
+
 #define ALIGNMENT 8
 #define MINBLOCKSIZE 24
 
@@ -163,20 +165,22 @@ void *mm_malloc(size_t size) {
     // First or best fit search freelist
     // go to the free list and find the free block 
 
+    // return null if can't find block 
     bp = find_block(class_index, asize);
+    
+    // extract extend and other from find_block 
 
-
-
-    //old code
-    if ((bp = find_fit(asize)) != NULL) { // Search the free list for a fit
-        place(bp, asize);
-        return bp;
+    // if cant find block, extend
+    if (bp == NULL) {
+        size_t extend_size = MAX(asize, CHUNKSIZE);
+        if (bp = extend_heap(extend_size/DSIZE) == NULL) {
+            return NULL;
+        }
     }
+    
+    
 
-    extendsize = MAX(asize, CHUNKSIZE); // No fit found. Get more memory and place the block
-    if ((bp = extend_heap(extendsize/WSIZE)) == NULL)
-        return NULL;
-    place(bp, asize);
+
     return bp;
 }
 
@@ -185,40 +189,26 @@ void *mm_malloc(size_t size) {
 // returns pointer to the block 
 // maybe do some state updates?
 static void* find_block(size_t class_index, size_t asize) {
-    char *bp;
-    bp = HEADLIST(class_index); //lands at first block
-
-    while ((*(bp)) == NULL) {          //while NULL
-        if (class_index < 8) {  //not last size
-            bp = HEADLIST(class_index + 1); //increment class index
-        } else { // all class NULL, allocate block and return
-            size_t extend_size = MAX(asize, CHUNKSIZE);
-            if ((bp = extend_heap(extend_size/WSIZE)) == NULL) {
-                return NULL; //error handle?
-            } else { //no error
-                return bp;
+    for(;class_index < SIZECLASSCOUNT; class_index++) {
+        for (char *bp = HEADLIST(class_index); bp; bp = NEXT(bp)) { //iterate blocks
+            if (GET_SIZE(HDRP(bp)) >= asize && !GET_ALLOC(HDRP(bp))) {
+                return bp; // found
             }
-        }
+        }    
     }
-    // iterate inside one class to find the free block
-    while (!((!(GET_ALLOC(HDRP(bp)))) && (GET_SIZE(HDRP(bp)) >= asize))) { // == needs to change?
-        //go next 
-        bp = *((char *)bp + DSIZE); //bp=bp->next
-        if (bp == NULL) { // what if we reach end?
-            //go next size class 
-            if (class_index < 8) {  //not last size
-            bp = HEADLIST(class_index + 1); //increment class index
-            } else { // all class exhausted, allocate block and return
-                size_t extend_size = MAX(asize, CHUNKSIZE);
-                if ((bp = extend_heap(extend_size/WSIZE)) == NULL) {
-                    return NULL; //error handle?
-                } else { //no error
-                    return bp;
-                }
-            }
-        }
-    } 
-    // found 
+    return NULL;
+    // this logic took longer than it should to write
+}
+     
+    // if found return bp
+    // if not found return null
+
+    //move all below 
+
+    // call before split
+    // split changes size which list remove depends on to find size class
+    list_remove(bp);
+
     // test for split
     size_t csize = GET_SIZE(HDRP(bp)); // block size of 
     size_t diff = csize - asize; // size always >= asize
@@ -229,15 +219,14 @@ static void* find_block(size_t class_index, size_t asize) {
         // set next block's prev bits. Next contiguous block = next contiguous block
         SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
     }
-    
+
     // update curr bits
     SET_ALLOC(HDRP(bp));
-    SET_ALLOC(FTRP(bp));
 
     // remove the block from free list
-    list_remove(bp);
+    
     return bp; //bp read
-}
+
 
 // split extra block and place fragment in appropriate size class
 static void split(char *bp, size_t asize) {
