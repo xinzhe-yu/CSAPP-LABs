@@ -16,7 +16,14 @@
 #include "mm.h"
 #include "memlib.h"
 
+static void *extend_heap(size_t words);
+static void* find_block(size_t class_index, size_t asize);
+static void split(char *bp, size_t asize);
+static void list_insert(char *bp);
+static void list_remove(char *bp);
 static size_t find_sizeclass(size_t size);
+
+static void *coalesce(void *bp);
 
 // NOTE TO STUDENTS: Before you do anything else, please
 // provide your team information in the following struct.
@@ -106,7 +113,7 @@ int mm_init(void) {
     PUT(heap_listp + (18*WSIZE), 0);              // Alignment padding
     PUT(heap_listp + (19*WSIZE), PACK(DSIZE, 1, 1)); // Prologue header
     PUT(heap_listp + (20*WSIZE), PACK(DSIZE, 1, 1)); // Prologue footer
-    PUT(heap_listp + (21*WSIZE), PACK(0, 1, 1));     // Epilogue header
+    PUT(heap_listp + (21*WSIZE), PACK(0, 1, 1));     // Epilogue header. prev cont. block allocated
     
 
     return 0;
@@ -127,13 +134,11 @@ static void *extend_heap(size_t words) {
     //get pre state from old epilouge
     int prev_alloc = GET_PRE_ALLOC(HDRP(bp));
 
-    PUT(HDRP(bp), PACK(size, prev_alloc, 0));         // Free block header
-    PUT((bp), NULL);                      // Prev
-    PUT((bp+DSIZE), NULL);                // Next
+    PUT(HDRP(bp), PACK(size, prev_alloc, 0));         // Free block's new header
     PUT(FTRP(bp), PACK(size, prev_alloc, 0));         // Free block footer
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 0, 1)); // New epilogue header
-
-    // Coalesce if the previous block was free
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 0, 1)); // New epilogue header. Prev cont. block just allocated is free
+    
+    // Coalesce runs case 1 or 3
     return coalesce(bp);
 }
 
@@ -301,10 +306,13 @@ static size_t find_sizeclass(size_t size) {
 
 // mm_free - Freeing a block does nothing.
 void mm_free(void *bp) {
-    size_t size = GET_SIZE(HDRP(bp));
-
-    PUT(HDRP(bp), PACK(size, 0));
-    PUT(FTRP(bp), PACK(size, 0));
+    size_t csize = GET_SIZE(HDRP(bp));
+    //change allocation bit
+    //give self footer
+    CLR_ALLOC(HDRP(bp));
+    PUT(HDRP(bp), PACK(csize, GET_PRE_ALLOC(HDRP(bp)), 0));
+    PUT(FTRP(bp), PACK(csize, GET_PRE_ALLOC(HDRP(bp)), 0));
+    //coalesce
     coalesce(bp);
 }
 
@@ -317,65 +325,74 @@ static void *coalesce(void *bp) {
     size_t csize = GET_SIZE(HDRP(bp));
 
     if (prev_alloc && next_alloc) {            // Case 1
-        return bp;
+        // bp just freed, not in free list
+        // notifiy next alloc block, prev is free
+        SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
+
+        // insert coalesce block into new size class
+        list_insert(bp);
     }
 
     else if (prev_alloc && !next_alloc) {      // Case 2 // Next free
-        // Relink double linked list USE PUT_PTR
-        PUT((*NEXT_BLKP(bp)), bp);
-        PUT((bp), *NEXT_BLKP(bp));
-        PUT((bp+DSIZE), *(NEXT_BLKP(bp) + DSIZE));
-        PUT(*(NEXT_BLKP(bp) + DSIZE), bp);
+        // bp just freed, not in free list
+        // remove next contiguous block from its free list
+        char *n_bp = (NEXT_BLKP(bp));
+        list_remove(n_bp);
 
-        // Clear old pointer
-        PUT(NEXT_BLKP(bp), NULL);
-        PUT((NEXT_BLKP(bp) + DSIZE), NULL);
+        // coalsece block - Header, size allocate states
+        size_t tsize = csize + GET_SIZE(HDRP(n_bp));  // total size
+        PUT(HDRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 0));
+        PUT(FTRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 0));
 
-        csize += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        PUT(HDRP(bp), PACK(csize, 0));
-        PUT(FTRP(bp), PACK(csize, 0));
+        // notifiy next alloc block, prev is free 
+        // n_bp was already free, next_block prev bit already 0
+        //SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
+    
+        // insert coalesce block into new size class
+        list_insert(bp);
     }
 
-    else if (!prev_alloc && next_alloc) {      // Case 3 // prev free is unchanged
-        //verified
-        csize += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        int succ_prev_alloc = GET_PRE_ALLOC((HDRP(PREV_BLKP(bp)))); // Get succ states
-        PUT(FTRP(bp), PACK(csize, succ_prev_alloc, 0));              // new size + old state
-        PUT(HDRP(PREV_BLKP(bp)), PACK(csize, succ_prev_alloc, 0));
-        bp = PREV_BLKP(bp);
+    else if (!prev_alloc && next_alloc) {      // Case 3 // prev 
+        // bp just freed, not in free list
+        // remove prev contiguous block from its free list
+        char *p_bp = (PREV_BLKP(bp));
+        list_remove(p_bp);
+
+        // coalsece block - Header, size allocate states
+        size_t tsize = csize + GET_SIZE(HDRP(p_bp));
+        PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 0));
+        PUT(FTRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 0));
+
+        // notifiy next alloc block, prev is free
+        SET_PRE_ALLOC(HDRP(NEXT_BLKP(p_bp)));
+        // insert coalesce block into new size class
+        list_insert(p_bp);
+        bp = p_bp;
     }
 
-    else {                                     // Case 4 // Both side free
-        // Relink double linked list USE PUT_PTR
-        PUT(bp + DSIZE, NULL);
-        PUT(bp, NULL);
-
-        PUT((PREV_BLKP(bp) + DSIZE), *(NEXT_BLKP(bp) + DSIZE));
-        PUT(*(NEXT_BLKP(bp) + DSIZE) , PREV_BLKP(bp));
+    else {                                     // Case 4 // Both 
+        // bp just freed, not in free list
+        // remove prev and next contiguous block from its free list
+        char *p_bp = (PREV_BLKP(bp));
+        list_remove(p_bp);
+        char *n_bp = (NEXT_BLKP(bp));
+        list_remove(n_bp);
         
-        PUT(NEXT_BLKP(bp) + DSIZE, NULL);
-        PUT(NEXT_BLKP(bp), NULL);
+        // coalsece block - Header, size allocate states
+        size_t tsize = csize + GET_SIZE(HDRP(p_bp)) + GET_SIZE(HDRP(n_bp));
+        PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 0));
+        PUT(FTRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 0));
 
-        csize += GET_SIZE(HDRP(PREV_BLKP(bp))) +
-                GET_SIZE(FTRP(NEXT_BLKP(bp)));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(csize, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(csize, 0));
+        // notifiy next alloc block, prev is free
+        // n_bp was already free, next_block prev bit already 0
+        //SET_PRE_ALLOC(HDRP(NEXT_BLKP(p_bp)));
 
-        // Bp still in middle
-
-
-
-        //bp = PREV_BLKP(bp);
+        // insert coalesce block into new size class
+        list_insert(p_bp);
+        bp = p_bp;
     }
     return bp;
 }
-
-
-
-
-
-
-
 
 
 
