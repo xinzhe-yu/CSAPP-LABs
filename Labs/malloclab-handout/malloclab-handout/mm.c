@@ -144,13 +144,6 @@ void *mm_malloc(size_t size) {
     size_t extendsize; // Amount to extend heap if no fit
     char *bp;
     if (size == 0) { return NULL; } // Ignore spurious requests
-
-    //Determine size class 
-    //First or best fit seach free list
-    //Split and insert fragments in appropraite list
-    //if cant find search next class size
-    //if cant find allocate from heap and split remaining in appropriate list
-
     if (size <= MINBLOCKSIZE - HDR) // Adjust block size to include overhead and alignment reqs.
         asize = MINBLOCKSIZE;
     else {
@@ -166,28 +159,37 @@ void *mm_malloc(size_t size) {
     // go to the free list and find the free block 
 
     // return null if can't find block 
-    bp = find_block(class_index, asize);
-    
-    // extract extend and other from find_block 
-
-    // if cant find block, extend
-    if (bp == NULL) {
+    if ((bp = find_block(class_index, asize)) == NULL) { // if cant find block, extend
         size_t extend_size = MAX(asize, CHUNKSIZE);
         if (bp = extend_heap(extend_size/DSIZE) == NULL) {
             return NULL;
         }
     }
     
-    
+    // call before split
+    // split changes size which list remove depends on to find size class
+    list_remove(bp);
 
+    // test for split
+    size_t csize = GET_SIZE(HDRP(bp)); // block size of 
+    size_t diff = csize - asize; // size always >= asize
+    if ((diff >= MINBLOCKSIZE)) {
+        // split. Next contiguous block = fragment itself
+        split(bp, asize);
+    } else {
+        // set next block's prev bits. Next contiguous block = next contiguous block
+        SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
+    }
+
+    // update curr bits
+    SET_ALLOC(HDRP(bp));
 
     return bp;
 }
 
-
 // find free block
 // returns pointer to the block 
-// maybe do some state updates?
+// maybe do some state updates? -no, only find block 
 static void* find_block(size_t class_index, size_t asize) {
     for(;class_index < SIZECLASSCOUNT; class_index++) {
         for (char *bp = HEADLIST(class_index); bp; bp = NEXT(bp)) { //iterate blocks
@@ -199,34 +201,6 @@ static void* find_block(size_t class_index, size_t asize) {
     return NULL;
     // this logic took longer than it should to write
 }
-     
-    // if found return bp
-    // if not found return null
-
-    //move all below 
-
-    // call before split
-    // split changes size which list remove depends on to find size class
-    list_remove(bp);
-
-    // test for split
-    size_t csize = GET_SIZE(HDRP(bp)); // block size of 
-    size_t diff = csize - asize; // size always >= asize
-    if ((diff >= MINBLOCKSIZE)) {
-        // split. Next contiguous = fragment 
-        split(bp, asize);
-    } else {
-        // set next block's prev bits. Next contiguous block = next contiguous block
-        SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
-    }
-
-    // update curr bits
-    SET_ALLOC(HDRP(bp));
-
-    // remove the block from free list
-    
-    return bp; //bp read
-
 
 // split extra block and place fragment in appropriate size class
 static void split(char *bp, size_t asize) {
