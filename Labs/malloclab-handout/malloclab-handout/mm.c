@@ -119,7 +119,7 @@ int mm_init(void) {
     return 0;
 }
 
-//return beginning of new block
+//return beginning of new block or NULL sbrk failed
 static void *extend_heap(size_t words) {
     char *bp;
     size_t size;
@@ -166,7 +166,7 @@ void *mm_malloc(size_t size) {
     // return null if can't find block 
     if ((bp = find_block(class_index, asize)) == NULL) { // if cant find block, extend
         size_t extend_size = MAX(asize, CHUNKSIZE);
-        if (bp = extend_heap(extend_size/DSIZE) == NULL) {
+        if ((bp = extend_heap(extend_size/DSIZE)) == NULL) {
             return NULL;
         }
     }
