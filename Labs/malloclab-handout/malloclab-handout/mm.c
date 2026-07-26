@@ -22,8 +22,9 @@ static void split(char *bp, size_t asize);
 static void list_insert(char *bp);
 static void list_remove(char *bp);
 static size_t find_sizeclass(size_t size);
-
 static void *coalesce(void *bp);
+static void mm_checkheap(int lineno);
+static int loop_detection(char *bp);
 
 // NOTE TO STUDENTS: Before you do anything else, please
 // provide your team information in the following struct.
@@ -40,7 +41,10 @@ team_t team = {
     ""
 };
 
-#define SIZECLASSCOUNT 8
+#define checkheap(lineno) mm_checkheap(lineno)
+//#define checkheap(lineno)
+
+#define NCLASSES 9
 
 #define ALIGNMENT 8
 #define MINBLOCKSIZE 24
@@ -92,8 +96,10 @@ team_t team = {
 
 // Returns address of block, land at the first block 
 #define HEADLIST(index) (*((char **)((char *)heap_listp + (index * DSIZE))))
+
 // Global variables
 static char *heap_listp = NULL;   // pointer to data structure | free list heads | Prolouge header | ...
+static char *prologue_bp;
 
 // mm_init - initialize the malloc package.
 int mm_init(void) {
@@ -114,8 +120,10 @@ int mm_init(void) {
     PUT(heap_listp + (19*WSIZE), PACK(DSIZE, 1, 1)); // Prologue header
     PUT(heap_listp + (20*WSIZE), PACK(DSIZE, 1, 1)); // Prologue footer
     PUT(heap_listp + (21*WSIZE), PACK(0, 1, 1));     // Epilogue header. prev cont. block allocated
-    
 
+    size_t heads = NCLASSES * DSIZE;
+    size_t pad = (heads + WSIZE) % DSIZE ? WSIZE : 0;  // pad so prologue payload is 8-aligned
+    prologue_bp = heap_listp + heads + pad;
     return 0;
 }
 
@@ -146,7 +154,6 @@ static void *extend_heap(size_t words) {
 //     Always allocate a block whose size is a multiple of the alignment.
 void *mm_malloc(size_t size) {
     size_t asize;      // Adjusted block size
-    size_t extendsize; // Amount to extend heap if no fit
     char *bp;
     if (size == 0) { return NULL; } // Ignore spurious requests
     if (size <= MINBLOCKSIZE - HDR) // Adjust block size to include overhead and alignment reqs.
@@ -196,7 +203,7 @@ void *mm_malloc(size_t size) {
 // returns pointer to the block 
 // maybe do some state updates? -no, only find block 
 static void* find_block(size_t class_index, size_t asize) {
-    for(;class_index < SIZECLASSCOUNT; class_index++) {
+    for(;class_index < NCLASSES; class_index++) {
         for (char *bp = HEADLIST(class_index); bp; bp = NEXT(bp)) { //iterate blocks
             if (GET_SIZE(HDRP(bp)) >= asize && !GET_ALLOC(HDRP(bp))) {
                 return bp; // found
@@ -302,6 +309,7 @@ static size_t find_sizeclass(size_t size) {
     } else if (4096 <= size) {
         return 8;
     }
+    return -1;
 }
 
 // mm_free - Freeing a block does nothing.
@@ -413,7 +421,106 @@ void *mm_realloc(void *ptr, size_t size) {
     return newptr;
 }
 
+static void mm_checkheap(int lineno) {
+    // Free list level
+    // For each free block make sure header == footer in size and allocation
+    for(int class_index = 0; class_index < NCLASSES - 1; class_index++) {
+        for (char *bp = HEADLIST(class_index); bp; bp = NEXT(bp)) { //iterate blocks
+            if (GET_SIZE(HDRP(bp)) != GET_SIZE(FTRP(bp))) { // Size mismatch 
+                printf("Size missmatch: Line %d", lineno);
+            }
+            if (GET_ALLOC(HDRP(bp)) != GET_ALLOC(FTRP(bp))) { // Alloc bit mismatch 
+                printf("Allocation bit missmatch: Line %d\n", lineno);
+            }
+            if (GET_ALLOC(HDRP(bp)) == 1 || GET_ALLOC(FTRP(bp)) == 1) { // alloc block in freelist
+                printf("Allocated block in freelist: Line %d\n", lineno);
+            }
+            if ((uintptr_t)bp % 8 != 0) { // Payload area is aligned 
+                printf("Payload misaligned: Line %d\n", lineno);
+            }
+            if (find_sizeclass(GET_SIZE(HDRP(bp))) != class_index) { // Segregated list contain only blocks that beling to the size class
+                printf("Free block in wrong size class: Line %d\n", lineno);
+            }
+            if (NEXT(bp) != NULL) { // Next/prev pointers in consecutive free blocks are consistent
+                //check if bp->next->prev == bp 
+                if (PREV(NEXT(bp)) != bp) {
+                    printf("Next/Prev mismatch: Line %d\n", lineno);
+                }
+            }
+        }    
+    }
 
+
+    // Heap level
+    // Prologue/Epilogue blocks are at specific locations (e.g. heap boundaries and have special size/alloc fields)
+    // All blocks stay in between the heap boundares
+
+    char *epi_bp = (char *)mem_heap_hi() - 3;
+    
+    if (GET_SIZE((epi_bp)) != 0) { //Epilogue is at specific locations
+        printf("Epilouge misplaced: Line %d\n", lineno);
+    }
+
+    if (GET_SIZE((epi_bp)) == 0 && GET_ALLOC((epi_bp))) { //Epilogue never has free bit
+        printf("Epilouge alloc bit = 0, should = 1: Line %d\n", lineno);
+    }
+
+    // hardcoded prolouge offsest 
+    char *pro_bp = prologue_bp;
+    if (GET_SIZE(HDRP(pro_bp)) != DSIZE) {
+        printf("Prolouge header size error: Line %d\n", lineno);
+    }
+    if (GET_SIZE(((char *)pro_bp + WSIZE)) != DSIZE) {
+        printf("Prolouge header size error: Line %d\n", lineno);
+    }
+
+    char *first_block = heap_listp + (21*WSIZE);
+    for (char *bp = first_block; bp < epi_bp; bp = NEXT_BLKP(bp)) {
+        if (!GET_ALLOC(HDRP(bp)) && !GET_ALLOC(HDRP(NEXT_BLKP(bp)))) { // No contigous free blocks in memory
+            printf("Consecutive free/alloc blocks: Line %d\n", lineno);
+        }
+        if (GET_ALLOC(HDRP(bp)) != GET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)))) {
+            printf("Next block's Prev alloc bit is inncorrectly set: Line %d\n", lineno);
+        }
+
+        if (!GET_ALLOC(HDRP(bp))) { // All free blocks are in the free list
+            // find in list 
+            int is_include = 0;
+            for (char *t_bp = HEADLIST(find_sizeclass(GET_SIZE(HDRP(bp)))); t_bp; t_bp = NEXT(t_bp)) { // Travse the size class
+                if (bp == t_bp) {
+                    is_include = 1;
+                    break;
+                }
+            }
+            if (!is_include) {
+                printf("Free block not in free list: Line %d\n", lineno);
+            }
+        }
+    }
+    // No cycles in the list
+    for (int i = 0; i < NCLASSES; i++) { //iterate all heads
+        // Pass in head 
+        // call cycle detection 
+        if(loop_detection(HEADLIST(i))) {
+            printf("Free list cycle detected: Line %d\n", lineno);
+        }
+    }
+
+    // Other 
+}
+
+// returns if cycle detected 
+static int loop_detection(char *bp) {
+    char *slow = bp, *fast = bp;
+    while (fast && NEXT(fast)) {
+        slow = NEXT(slow);
+        fast = NEXT(NEXT(fast));
+        if (slow == fast) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 
 
