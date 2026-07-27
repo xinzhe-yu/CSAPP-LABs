@@ -124,6 +124,7 @@ int mm_init(void) {
     size_t heads = NCLASSES * DSIZE;
     size_t pad = (heads + WSIZE) % DSIZE ? WSIZE : 0;  // pad so prologue payload is 8-aligned
     prologue_bp = heap_listp + heads + pad;
+    checkheap(__LINE__);
     return 0;
 }
 
@@ -173,7 +174,7 @@ void *mm_malloc(size_t size) {
     // return null if can't find block 
     if ((bp = find_block(class_index, asize)) == NULL) { // if cant find block, extend
         size_t extend_size = MAX(asize, CHUNKSIZE);
-        if ((bp = extend_heap(extend_size/DSIZE)) == NULL) {
+        if ((bp = extend_heap(extend_size/WSIZE)) == NULL) {
             return NULL;
         }
     }
@@ -461,7 +462,7 @@ static void mm_checkheap(int lineno) {
         printf("Epilouge misplaced: Line %d\n", lineno);
     }
 
-    if (GET_SIZE((epi_bp)) == 0 && GET_ALLOC((epi_bp))) { //Epilogue never has free bit
+    if (GET_SIZE((epi_bp)) == 0 && !GET_ALLOC((epi_bp))) { //Epilogue never has free bit
         printf("Epilouge alloc bit = 0, should = 1: Line %d\n", lineno);
     }
 
