@@ -60,6 +60,8 @@ team_t team = {
 #define DSIZE 8 // Double word size (bytes)
 #define CHUNKSIZE (1<<12) // Extend heap by this amount (bytes)
 #define MAX(x, y) ((x) > (y)? (x) : (y))
+#define MIN(x, y) ((x) > (y)? (y) : (x))
+
 
 // Pack a size and allocated bit into a word
 #define PACK(size, prealloc, alloc) ((size) | (prealloc << 1) | (alloc))
@@ -119,12 +121,12 @@ int mm_init(void) {
     PUT(heap_listp + (18*WSIZE), 0);              // Alignment padding
     PUT(heap_listp + (19*WSIZE), PACK(DSIZE, 1, 1)); // Prologue header
     PUT(heap_listp + (20*WSIZE), PACK(DSIZE, 1, 1)); // Prologue footer
-    PUT(heap_listp + (21*WSIZE), PACK(0, 1, 1));     // Epilogue header. prev cont. block allocated
+    PUT(heap_listp + (21*WSIZE), PACK(0, 1, 1));     // Epilogue header. prev contiguous block allocated
 
     size_t heads = NCLASSES * DSIZE;
     size_t pad = (heads + WSIZE) % DSIZE ? WSIZE : 0;  // pad so prologue payload is 8-aligned
     prologue_bp = heap_listp + heads + pad;
-    checkheap(__LINE__);
+    
     return 0;
 }
 
@@ -225,8 +227,7 @@ static void split(char *bp, size_t asize) {
     // Pack headers/footers
     // Being allocated block - no footer
     PUT(HDRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
-    //PUT(FTRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
-
+  
     // Free block / set next block's prev bits
     PUT(HDRP(frag_bp), PACK(frag_size, 1, 0)); 
     PUT(FTRP(frag_bp), PACK(frag_size, 1, 0));
@@ -319,7 +320,6 @@ void mm_free(void *bp) {
     //change allocation bit
     //give self footer
     CLR_ALLOC(HDRP(bp));
-    PUT(HDRP(bp), PACK(csize, GET_PRE_ALLOC(HDRP(bp)), 0));
     PUT(FTRP(bp), PACK(csize, GET_PRE_ALLOC(HDRP(bp)), 0));
     //coalesce
     coalesce(bp);
@@ -336,7 +336,7 @@ static void *coalesce(void *bp) {
     if (prev_alloc && next_alloc) {            // Case 1
         // bp just freed, not in free list
         // notifiy next alloc block, prev is free
-        SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
+        CLR_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
 
         // insert coalesce block into new size class
         list_insert(bp);
@@ -373,7 +373,7 @@ static void *coalesce(void *bp) {
         PUT(FTRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 0));
 
         // notifiy next alloc block, prev is free
-        SET_PRE_ALLOC(HDRP(NEXT_BLKP(p_bp)));
+        CLR_PRE_ALLOC(HDRP(NEXT_BLKP(p_bp)));
         // insert coalesce block into new size class
         list_insert(p_bp);
         bp = p_bp;
@@ -406,20 +406,46 @@ static void *coalesce(void *bp) {
 
 
 // mm_realloc - Implemented simply in terms of mm_malloc and mm_free
-void *mm_realloc(void *ptr, size_t size) {
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
+void *mm_realloc(void *bp, size_t asize) {
+    void *new_bp;
+    size_t csize = GET_SIZE(HDRP(bp));
+    asize = ALIGN(asize);
+
+    if (asize == csize) {
+        return bp;
+    }
     
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+    // Shrink Case 
+    // If new size fits in block, split extra 
+    if (asize < csize) {
+        int diff = csize - asize;
+        if (diff >= MINBLOCKSIZE) {
+            // split
+            split(bp, asize);
+        }
+        return bp;
+    } // what if shrink case but diff not enough to shrink
+
+    if ((GET_SIZE(HDRP(NEXT_BLKP(bp))) == 0) && GET_ALLOC(HDRP(NEXT_BLKP(bp)))) { // Next block is epilouge, extend heap to realloc 
+        int diff = asize - csize;
+        extend_heap(diff/WSIZE);
+        PUT(HDRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
+        return bp;
+    }
+
+    // add absorb and prev/next absorbs
+
+    // Fallback
+    new_bp = mm_malloc(asize);
+    size_t old_payload = GET_SIZE(HDRP(new_bp)) - HDR;
+    size_t new_payload = GET_SIZE(HDRP(bp)) - HDR;
+    // Min of two payload because possible expand/shrink
+    // memcpy starting at payload to payload no header
+    memcpy(new_bp, bp, MIN(old_payload, new_payload));
+    mm_free(bp);
+    return new_bp;
+    
+    
 }
 
 static void mm_checkheap(int lineno) {
@@ -468,11 +494,11 @@ static void mm_checkheap(int lineno) {
 
     // hardcoded prolouge offsest 
     char *pro_bp = prologue_bp;
-    if (GET_SIZE(HDRP(pro_bp)) != DSIZE) {
+    if (GET_SIZE((pro_bp)) != DSIZE) {
         printf("Prolouge header size error: Line %d\n", lineno);
     }
-    if (GET_SIZE(((char *)pro_bp + WSIZE)) != DSIZE) {
-        printf("Prolouge header size error: Line %d\n", lineno);
+    if (GET_SIZE((((char *)pro_bp) + WSIZE)) != DSIZE) {
+        printf("Prolouge footer size error: Line %d\n", lineno);
     }
 
     char *first_block = heap_listp + (21*WSIZE);
