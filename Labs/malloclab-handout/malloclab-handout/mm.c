@@ -463,8 +463,8 @@ void *mm_realloc(void *bp, size_t asize) {
         return bp;
     }
 
-    int next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-    int prev_alloc = GET_ALLOC(HDRP(PREV_BLKP(bp)));
+    size_t next_alloc = NEXT_IS_ALLOC(bp);
+    size_t prev_alloc = PRE_IS_ALLOC(bp);
 
     // absorb prev + next 
     if (!next_alloc && !prev_alloc) {
@@ -483,12 +483,12 @@ void *mm_realloc(void *bp, size_t asize) {
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
             return new_bp; 
+
         } else { // combine and extend heap
             int diff = asize - tsize;
-            char *ex_bp = extend_heap(diff/WSIZE);
-            tsize += GET_SIZE(HDRP(ex_bp));
+            char *ex_bp = extend_heap(diff/WSIZE); // Next block and extended block coalesced impicitly 
+            tsize = tsize + GET_SIZE(HDRP(ex_bp)) - nsize;
             list_remove(ex_bp);
-            list_remove(n_bp);
             list_remove(p_bp);
             PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
             new_bp = p_bp;
@@ -501,14 +501,15 @@ void *mm_realloc(void *bp, size_t asize) {
     // absorb prev
     if (!prev_alloc) {    
         size_t psize = GET_SIZE(HDRP(PREV_BLKP(bp))); 
-        size_t tsize;
+        size_t tsize = psize + csize;
         char *p_bp = PREV_BLKP(bp);
 
-        if((tsize = psize + csize) >= asize) { // see if prev size + csize >= asize 
+        if(tsize >= asize) { // see if prev size + csize >= asize 
             list_remove(p_bp); // remove_list(prev)
             new_bp = p_bp;
             PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
+            return new_bp;
         }
 
     }
