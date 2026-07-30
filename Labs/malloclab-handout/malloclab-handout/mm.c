@@ -19,7 +19,7 @@
 
 static void *extend_heap(size_t words);
 static void* find_block(size_t class_index, size_t asize);
-static void split(char *bp, size_t asize);
+static char *split(char *bp, size_t asize);
 static void list_insert(char *bp);
 static void list_remove(char *bp);
 static size_t find_sizeclass(size_t size);
@@ -194,7 +194,7 @@ void *mm_malloc(size_t size) {
     size_t diff = csize - asize; // size always >= asize
     if ((diff >= MINBLOCKSIZE)) {
         // split. Next contiguous block = fragment itself
-        split(bp, asize);
+        bp = split(bp, asize);
         SET_ALLOC(HDRP(bp));
         checkheap(__LINE__);
     } else {
@@ -226,27 +226,56 @@ static void* find_block(size_t class_index, size_t asize) {
 }
 
 // split extra block and place fragment in appropriate size class
-static void split(char *bp, size_t asize) {
-    // split any surplus of 24+ 
-    char *frag_bp = bp + asize;
+static char *split(char *bp, size_t asize) {
+    char *frag_bp;
+    char *new_bp;
     size_t csize = GET_SIZE(HDRP(bp));
     size_t frag_size = csize - asize;
 
+    if (asize < MINBLOCKSIZE) { // split any surplus of 24+ 
+        return bp; 
+    }
 
-    /* add split placement policy 
+    if (frag_size < MINBLOCKSIZE) {
+        return bp;
+    }
+
+    if (csize == asize) {
+        return bp;
+    }
+    
+    /* split placement policy 
     small placement takes the fornt 
     large request take the back */
-   
-    // Pack headers/footers
-    // Being allocated block - no footer
-    PUT(HDRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
-  
-    // Free block / set frag block's prev bits
-    PUT(HDRP(frag_bp), PACK(frag_size, 1, 0)); 
-    PUT(FTRP(frag_bp), PACK(frag_size, 1, 0));
 
-    // coalesce frag block 
-    coalesce(frag_bp);    
+    if (asize < (csize/2)) { // frag less than half of csize. place alloc at front
+        frag_bp = bp + asize;
+        // Pack headers/footers
+        // Being allocated block - no footer
+        PUT(HDRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
+        new_bp = bp;
+        // Free block / set frag block's prev bits
+        PUT(HDRP(frag_bp), PACK(frag_size, 1, 0)); 
+        PUT(FTRP(frag_bp), PACK(frag_size, 1, 0));     
+        // coalesce frag block 
+        
+        coalesce(frag_bp);  
+        checkheap(__LINE__);
+    } 
+    else { // frag more than half of csize. place alloc at back 
+        frag_bp = bp;
+        new_bp = (char *)bp + frag_size;
+        memmove(new_bp, bp, (asize - HDR));
+        // Alloc header
+        PUT(HDRP(new_bp), PACK(asize, 0, 1));
+        // Next contiguous block's prev bit is 1
+        SET_PRE_ALLOC((HDRP(NEXT_BLKP(new_bp))));
+        // Header/footer of frag block, inherit prev bit from bp 
+        PUT(HDRP(frag_bp), PACK(frag_size, GET_PRE_ALLOC(HDRP(bp)), 0));
+        PUT(FTRP(frag_bp), PACK(frag_size, GET_PRE_ALLOC(HDRP(frag_bp)), 0));
+        coalesce(frag_bp);
+    }  
+    return new_bp;
 }
 
 // Insert policy for free block
@@ -449,7 +478,7 @@ void *mm_realloc(void *bp, size_t asize) {
         int diff = csize - asize;
         if (diff >= MINBLOCKSIZE) {
             // split
-            split(bp, asize);
+            bp = split(bp, asize);
         }
         checkheap(__LINE__);
         return bp;
@@ -468,7 +497,7 @@ void *mm_realloc(void *bp, size_t asize) {
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
             int diff = tsize - asize;
             if (diff >= MINBLOCKSIZE) {
-                split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+                new_bp = split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
             }
             checkheap(__LINE__);
             return new_bp; 
@@ -507,7 +536,7 @@ void *mm_realloc(void *bp, size_t asize) {
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp))); // after merge, set new next block's prev alloc bit
             diff = tsize - asize;
             if (diff >= MINBLOCKSIZE) {
-                split(bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+                bp = split(bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
             }
             checkheap(__LINE__);
             return bp;
@@ -526,7 +555,7 @@ void *mm_realloc(void *bp, size_t asize) {
             PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
             if (tsize - asize >= MINBLOCKSIZE) {
-                split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+                new_bp = split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
             }
 
             checkheap(__LINE__);
@@ -553,7 +582,7 @@ void *mm_realloc(void *bp, size_t asize) {
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload
             if (tsize - asize >= MINBLOCKSIZE) {
-                split(new_bp, asize); //split extra absorbed free block
+                new_bp = split(new_bp, asize); //split extra absorbed free block
             }
             checkheap(__LINE__);
             return new_bp;
@@ -589,7 +618,7 @@ void *mm_realloc(void *bp, size_t asize) {
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload
             diff = tsize - asize;
             if (diff >= MINBLOCKSIZE) {
-                split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+                new_bp = split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
             }
             checkheap(__LINE__);
             return new_bp; 
