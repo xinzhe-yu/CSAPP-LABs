@@ -246,13 +246,7 @@ static void split(char *bp, size_t asize) {
     PUT(FTRP(frag_bp), PACK(frag_size, 1, 0));
 
     // coalesce frag block 
-    char *c_bp = coalesce(frag_bp);
-
-    // update: clear c_bp's next blocks prev bits
-    CLR_PRE_ALLOC(HDRP(NEXT_BLKP(c_bp)));
-
-    // Insert frag to new list
-    list_insert(c_bp);
+    coalesce(frag_bp);    
 }
 
 // Insert policy for free block
@@ -462,6 +456,9 @@ void *mm_realloc(void *bp, size_t asize) {
     if ((GET_SIZE(HDRP(NEXT_BLKP(bp))) == 0) && GET_ALLOC(HDRP(NEXT_BLKP(bp)))) { // Next block is epilouge, extend heap to realloc 
         int diff = asize - csize;
         char *ex_bp = extend_heap(diff/WSIZE);
+        if (ex_bp == NULL) {
+            return NULL;
+        }
         list_remove(ex_bp);
         PUT(HDRP(bp), PACK(csize + GET_SIZE(HDRP(ex_bp)), GET_PRE_ALLOC(HDRP(bp)), 1));
         SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp)));
@@ -490,9 +487,12 @@ void *mm_realloc(void *bp, size_t asize) {
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
             return new_bp; 
 
-        } else { // combine and extend heap
+        } else if (GET_SIZE(HDRP(NEXT_BLKP(n_bp))) == 0) { // combine and extend heap
             int diff = asize - tsize;
             char *ex_bp = extend_heap(diff/WSIZE); // Next block and extended block coalesced impicitly 
+            if (ex_bp == NULL) {
+                return NULL;
+            }
             tsize = tsize + GET_SIZE(HDRP(ex_bp)) - nsize;
             list_remove(ex_bp);
             list_remove(p_bp);
@@ -513,7 +513,7 @@ void *mm_realloc(void *bp, size_t asize) {
         if(tsize >= asize) { // see if prev size + csize >= asize 
             list_remove(p_bp); // remove_list(prev)
             new_bp = p_bp;
-            PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
+            PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
             return new_bp;
         }
