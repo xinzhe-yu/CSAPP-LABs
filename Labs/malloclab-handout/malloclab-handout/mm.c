@@ -231,6 +231,11 @@ static void split(char *bp, size_t asize) {
     char *frag_bp = bp + asize;
     size_t csize = GET_SIZE(HDRP(bp));
     size_t frag_size = csize - asize;
+
+
+    /* add split placement policy 
+    small placement takes the fornt 
+    large request take the back */
    
     // Pack headers/footers
     // Being allocated block - no footer
@@ -458,10 +463,80 @@ void *mm_realloc(void *bp, size_t asize) {
         return bp;
     }
 
-    // add absorb and prev/next absorbs
+    int next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+    int prev_alloc = GET_ALLOC(HDRP(PREV_BLKP(bp)));
+
+    // absorb prev + next 
+    if (!next_alloc && !prev_alloc) {
+        size_t nsize = GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        size_t psize = GET_SIZE(HDRP(PREV_BLKP(bp)));
+        size_t tsize = nsize + psize + csize;
+
+        char *n_bp = NEXT_BLKP(bp);
+        char *p_bp = PREV_BLKP(bp);
+
+        if (tsize >= asize) { // check if size of nsize + psize + csize >= asize 
+            list_remove(n_bp); // remove_list next & prev
+            list_remove(p_bp); // idea: scan both at once
+            PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1)); // pack new/prev header, grab prev-alloc bit from curr header
+            new_bp = p_bp;
+            SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
+            memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
+            return new_bp; 
+        } else { // combine and extend heap
+            int diff = asize - tsize;
+            char *ex_bp = extend_heap(diff/WSIZE);
+            tsize += GET_SIZE(HDRP(ex_bp));
+            list_remove(ex_bp);
+            list_remove(n_bp);
+            list_remove(p_bp);
+            PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
+            new_bp = p_bp;
+            SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
+            memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
+            return new_bp; 
+        }
+    }
+
+    // absorb prev
+    if (!prev_alloc) {    
+        size_t psize = GET_SIZE(HDRP(PREV_BLKP(bp))); 
+        size_t tsize;
+        char *p_bp = PREV_BLKP(bp);
+
+        if((tsize = psize + csize) >= asize) { // see if prev size + csize >= asize 
+            list_remove(p_bp); // remove_list(prev)
+            new_bp = p_bp;
+            PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
+            memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
+        }
+
+    }
+
+    /*
+    if (next_alloc) {
+    }
+    */
+    
+
+
+
+     
+    
+   
+    
+    
+    
+
+
+
+    // next is free but short = extend heap 
+
+    // 
 
     // Fallback
-    new_bp = mm_malloc(asize);
+    //new_bp = mm_malloc(asize + (asize*.25)); // 25% slack buffer
+    new_bp = mm_malloc(asize); // 25% slack buffer
     size_t old_payload = GET_SIZE(HDRP(new_bp)) - HDR;
     size_t new_payload = GET_SIZE(HDRP(bp)) - HDR;
     // Min of two payload because possible expand/shrink
