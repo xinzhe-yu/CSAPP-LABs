@@ -241,12 +241,18 @@ static void split(char *bp, size_t asize) {
     // Being allocated block - no footer
     PUT(HDRP(bp), PACK(asize, GET_PRE_ALLOC(HDRP(bp)), 1));
   
-    // Free block / set next block's prev bits
+    // Free block / set frag block's prev bits
     PUT(HDRP(frag_bp), PACK(frag_size, 1, 0)); 
     PUT(FTRP(frag_bp), PACK(frag_size, 1, 0));
 
+    // coalesce frag block 
+    char *c_bp = coalesce(frag_bp);
+
+    // update: clear c_bp's next blocks prev bits
+    CLR_PRE_ALLOC(HDRP(NEXT_BLKP(c_bp)));
+
     // Insert frag to new list
-    list_insert(frag_bp);
+    list_insert(c_bp);
 }
 
 // Insert policy for free block
