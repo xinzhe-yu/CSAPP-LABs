@@ -248,7 +248,9 @@ static char *split(char *bp, size_t asize) {
     small placement takes the fornt 
     large request take the back */
 
-    if (asize < (csize/2)) { // frag less than half of csize. place alloc at front
+
+    // Score: 92/100 | if (asize < (csize/2)) 
+    if (asize < 96) { // frag less than half of csize. place alloc at front
         frag_bp = bp + asize;
         // Pack headers/footers
         // Being allocated block - no footer
