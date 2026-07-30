@@ -478,7 +478,7 @@ void *mm_realloc(void *bp, size_t asize) {
         if (tsize >= asize) { // check if size of nsize + psize + csize >= asize 
             list_remove(n_bp); // remove_list next & prev
             list_remove(p_bp); // idea: scan both at once
-            PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1)); // pack new/prev header, grab prev-alloc bit from curr header
+            PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1)); // pack new/prev header, inherit from p_bp 
             new_bp = p_bp;
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
