@@ -517,13 +517,35 @@ void *mm_realloc(void *bp, size_t asize) {
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
             return new_bp;
         }
-
     }
 
-    /*
+    
     if (!next_alloc) {
+        char *n_bp = NEXT_BLKP(bp);
+        size_t nsize = GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        int tsize = csize + nsize;
+
+        if (tsize >= asize) { // absorb next 
+            list_remove(n_bp);
+            PUT(HDRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
+            new_bp = bp;
+            SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
+            return new_bp; 
+        } else if (GET_SIZE(HDRP(NEXT_BLKP(n_bp))) == 0) { // Free + epilouge = extend heap 
+            int diff = asize - tsize;
+            char *ex_bp = extend_heap(diff/WSIZE); // Next block and extended block coalesced impicitly 
+            if (ex_bp == NULL) {
+                return NULL;
+            }
+            tsize = tsize + GET_SIZE(HDRP(ex_bp)) - nsize;
+            list_remove(ex_bp);
+            PUT(HDRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
+            SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp))); // after merge, set new next block's prev alloc bit
+            memmove(bp, bp, (csize - HDR)); // memmove payload to prev's payload 
+            return bp; 
+        }
     }
-    */
+    
     
 
 
