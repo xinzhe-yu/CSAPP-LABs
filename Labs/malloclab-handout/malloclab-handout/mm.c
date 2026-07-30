@@ -514,7 +514,7 @@ void *mm_realloc(void *bp, size_t asize) {
     }
 
     /*
-    if (next_alloc) {
+    if (!next_alloc) {
     }
     */
     
