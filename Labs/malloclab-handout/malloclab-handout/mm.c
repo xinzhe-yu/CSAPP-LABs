@@ -503,23 +503,7 @@ void *mm_realloc(void *bp, size_t asize) {
             return new_bp; 
         }
     }
-
-    // absorb prev
-    if (!prev_alloc) {    
-        size_t psize = GET_SIZE(HDRP(PREV_BLKP(bp))); 
-        size_t tsize = psize + csize;
-        char *p_bp = PREV_BLKP(bp);
-
-        if(tsize >= asize) { // see if prev size + csize >= asize 
-            list_remove(p_bp); // remove_list(prev)
-            new_bp = p_bp;
-            PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
-            memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
-            return new_bp;
-        }
-    }
-
-    
+    //absorb next 
     if (!next_alloc) {
         char *n_bp = NEXT_BLKP(bp);
         size_t nsize = GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -544,11 +528,29 @@ void *mm_realloc(void *bp, size_t asize) {
             return bp; 
         }
     }
+
+    // absorb prev
+    if (!prev_alloc) {    
+        size_t psize = GET_SIZE(HDRP(PREV_BLKP(bp))); 
+        size_t tsize = psize + csize;
+        char *p_bp = PREV_BLKP(bp);
+
+        if(tsize >= asize) { // see if prev size + csize >= asize 
+            list_remove(p_bp); // remove_list(prev)
+            new_bp = p_bp;
+            PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
+            memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
+            return new_bp;
+        }
+    }
+
+    
+   
     
 
     // Fallback
-    //new_bp = mm_malloc(asize + (asize*.25)); // 25% slack buffer
-    new_bp = mm_malloc(asize); // 25% slack buffer
+    new_bp = mm_malloc(asize + (asize*.25)); // 25% slack buffer
+    //new_bp = mm_malloc(asize); // 25% slack buffer
     if (new_bp == NULL) {
         return NULL;
     }
