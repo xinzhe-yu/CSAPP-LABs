@@ -541,31 +541,17 @@ void *mm_realloc(void *bp, size_t asize) {
             list_remove(ex_bp);
             PUT(HDRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp))); // after merge, set new next block's prev alloc bit
-            memmove(bp, bp, (csize - HDR)); // memmove payload to prev's payload 
             return bp; 
         }
     }
     
-    
-
-
-
-     
-    
-   
-    
-    
-    
-
-
-
-    // next is free but short = extend heap 
-
-    // 
 
     // Fallback
     //new_bp = mm_malloc(asize + (asize*.25)); // 25% slack buffer
     new_bp = mm_malloc(asize); // 25% slack buffer
+    if (new_bp == NULL) {
+        return NULL;
+    }
     size_t old_payload = GET_SIZE(HDRP(new_bp)) - HDR;
     size_t new_payload = GET_SIZE(HDRP(bp)) - HDR;
     // Min of two payload because possible expand/shrink
