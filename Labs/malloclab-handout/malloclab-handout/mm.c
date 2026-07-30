@@ -484,8 +484,12 @@ void *mm_realloc(void *bp, size_t asize) {
             PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1)); // pack new/prev header, inherit from p_bp 
             new_bp = p_bp;
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
-            memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
-            return new_bp; 
+            memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload
+            if (tsize - asize >= MINBLOCKSIZE) {
+                split(new_bp, asize); //split extra absorbed free block
+            }
+            checkheap(__LINE__);
+            return new_bp;
 
         } else if (GET_SIZE(HDRP(NEXT_BLKP(n_bp))) == 0) { // combine and extend heap
             int diff = asize - tsize;
@@ -499,7 +503,12 @@ void *mm_realloc(void *bp, size_t asize) {
             PUT(HDRP(p_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
             new_bp = p_bp;
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
-            memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload 
+            memmove(new_bp, bp, (csize - HDR)); // memmove payload to prev's payload
+            diff = tsize - asize;
+            if (diff >= MINBLOCKSIZE) {
+                split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+            }
+            checkheap(__LINE__);
             return new_bp; 
         }
     }
@@ -514,6 +523,11 @@ void *mm_realloc(void *bp, size_t asize) {
             PUT(HDRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
             new_bp = bp;
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(new_bp))); // after merge, set new next block's prev alloc bit
+            int diff = tsize - asize;
+            if (diff >= MINBLOCKSIZE) {
+                split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+            }
+            checkheap(__LINE__);
             return new_bp; 
         } else if (GET_SIZE(HDRP(NEXT_BLKP(n_bp))) == 0) { // Free + epilouge = extend heap 
             int diff = asize - tsize;
@@ -525,7 +539,12 @@ void *mm_realloc(void *bp, size_t asize) {
             list_remove(ex_bp);
             PUT(HDRP(bp), PACK(tsize, GET_PRE_ALLOC(HDRP(bp)), 1));
             SET_PRE_ALLOC(HDRP(NEXT_BLKP(bp))); // after merge, set new next block's prev alloc bit
-            return bp; 
+            diff = tsize - asize;
+            if (diff >= MINBLOCKSIZE) {
+                split(bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+            }
+            checkheap(__LINE__);
+            return bp;
         }
     }
 
@@ -540,16 +559,17 @@ void *mm_realloc(void *bp, size_t asize) {
             new_bp = p_bp;
             PUT(HDRP(new_bp), PACK(tsize, GET_PRE_ALLOC(HDRP(p_bp)), 1));  // pack prev/new header - grab prev-alloc bit from curr header 
             memmove(new_bp, bp, (csize - HDR)); // memmove payload to payload, size of oldsize - HDR
+            if (tsize - asize >= MINBLOCKSIZE) {
+                split(new_bp, asize); //split extra absorbed free block, extended_heap allocates by 4k chunks
+            }
+
+            checkheap(__LINE__);
             return new_bp;
         }
     }
 
-    
-   
-    
-
     // Fallback
-    new_bp = mm_malloc(asize + (asize*.25)); // 25% slack buffer
+    new_bp = mm_malloc(asize + (asize*0)); // 25% slack buffer
     //new_bp = mm_malloc(asize); // 25% slack buffer
     if (new_bp == NULL) {
         return NULL;
