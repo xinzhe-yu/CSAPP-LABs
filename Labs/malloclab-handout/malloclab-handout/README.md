@@ -155,13 +155,11 @@ site does not.
 
 ## Limitations
 
-- `realloc(NULL, n)` and `realloc(p, 0)` are not standards-compliant. The benchmark does
-  not exercise either.
+- **32-bit word size.** Headers and footers are 4-byte words, following the assignment's
+  setup, which caps a single block at ~4 GB. On a 64-bit platform a 64-bit word would be
+  the better choice.
 - The 96-byte small/large placement threshold is fitted to this benchmark's size
   distribution. Working range for these traces is 80–120 bytes.
-- `realloc2-bal` at 77% is the weakest result. Placement costs ~9 points there against
-  gains of 56 on `realloc-bal` and ~40 on each binary trace — net positive, but a real
-  trade.
 - First-fit rather than best-fit within a class.
 - Single-threaded; no locking.
 

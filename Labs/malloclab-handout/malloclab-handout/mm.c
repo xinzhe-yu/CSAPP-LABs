@@ -1,12 +1,14 @@
-// mm-naive.c - The fastest, least memory-efficient malloc package.
+// mm.c - Segegated free list memory allocator
+// 
+// 
+// In this approach, a block is allocated by searching through the
+// segregated free list until an appropriate size has been found.
+// An allocated block consists of header + payload, while free blocks
+// consists of header, footer, and pointers for the linked list. 
+// Blocks can be split or coalesced to improve utilization. Realloc 
+// is implemented with optimization. 
 //
-// In this naive approach, a block is allocated by simply incrementing
-// the brk pointer.  A block is pure payload. There are no headers or
-// footers.  Blocks are never coalesced or reused. Realloc is
-// implemented directly using mm_malloc and mm_free.
-//
-// NOTE TO STUDENTS: Replace this header comment with your own header
-// comment that gives a high level description of your solution.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -27,28 +29,22 @@ static void *coalesce(void *bp);
 static void mm_checkheap(int lineno);
 static int loop_detection(char *bp);
 
-// NOTE TO STUDENTS: Before you do anything else, please
-// provide your team information in the following struct.
 team_t team = {
     // Team name
-    "ateam",
+    "TY",
     // First member's full name
     "Tommy Yu",
     // First member's email address
-    "bovik@cs.cmu.edu",
+    "tommyyu0326@gmail.com",
     // Second member's full name (leave blank if none)
     "",
     // Second member's email address (leave blank if none)
     ""
 };
 
+// Heap consistentcy checker 
 //#define checkheap(lineno) mm_checkheap(lineno)
 #define checkheap(lineno)
-
-#define NCLASSES 9
-
-#define ALIGNMENT 8
-#define MINBLOCKSIZE 24
 
 // rounds up to the nearest multiple of ALIGNMENT
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
@@ -59,6 +55,9 @@ team_t team = {
 #define FTR 4
 #define WSIZE 4 // Word and header/footer size (bytes)
 #define DSIZE 8 // Double word size (bytes)
+#define NCLASSES 9
+#define MINBLOCKSIZE 24
+#define ALIGNMENT 8
 #define CHUNKSIZE (1<<12) // Extend heap by this amount (bytes)
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 #define MIN(x, y) ((x) > (y)? (y) : (x))
@@ -81,6 +80,7 @@ team_t team = {
 #define GET_ALLOC(p) (GET(p) & 0x1)
 #define GET_PRE_ALLOC(p) ((GET(p) & 0x2) >> 1)
 
+// Check allocation bit of contiguous block 
 #define PRE_IS_ALLOC(bp) (GET_PRE_ALLOC(HDRP(bp)))
 #define NEXT_IS_ALLOC(bp) (GET_ALLOC(HDRP(NEXT_BLKP(bp))))
 
@@ -92,15 +92,15 @@ team_t team = {
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
-// Given a block ptr bp, access prev or next linked free block
+// Given a block ptr bp, access linked free block
 #define PREV(bp) (*((char **)bp))
 #define NEXT(bp) (*((char **)(((char *)(bp)) + DSIZE)))
 
-// Returns address of block, land at the first block 
+// Compute address of first block in appropriate size class
 #define HEADLIST(index) (*((char **)((char *)heap_listp + (index * DSIZE))))
 
 // Global variables
-static char *heap_listp = NULL;   // pointer to data structure | free list heads | Prolouge header | ...
+static char *heap_listp = NULL; 
 static char *prologue_bp = NULL;
 
 // mm_init - initialize the malloc package.
@@ -133,7 +133,8 @@ int mm_init(void) {
     return 0;
 }
 
-//return beginning of new block or NULL sbrk failed
+//return last free block or NULL sbrk failed
+//  new free block can coalesce with previous free block 
 static void *extend_heap(size_t words) {
     char *bp;
     size_t size;
@@ -143,11 +144,10 @@ static void *extend_heap(size_t words) {
     if ((long)(bp = mem_sbrk(size)) == -1)
         return NULL;
 
-    // Initialize free block header/footer, prev/succ pointer and the epilogue header
-
     //get pre state from old epilouge
     int prev_alloc = GET_PRE_ALLOC(HDRP(bp));
 
+    // Initialize free block header/footer, and epilogue header
     PUT(HDRP(bp), PACK(size, prev_alloc, 0));         // Free block's new header
     PUT(FTRP(bp), PACK(size, prev_alloc, 0));         // Free block footer
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 0, 1)); // New epilogue header. Prev cont. block just allocated is free
@@ -250,7 +250,7 @@ static char *split(char *bp, size_t asize) {
 
 
     // Score: 92/100 | if (asize < (csize/2)) 
-    if (asize < 96) { // frag less than half of csize. place alloc at front
+    if (asize < 96) { // asize than half of csize. place alloc at front
         frag_bp = bp + asize;
         // Pack headers/footers
         // Being allocated block - no footer
@@ -452,14 +452,17 @@ static void *coalesce(void *bp) {
     return bp;
 }
 
-
-
 // mm_realloc - Implemented simply in terms of mm_malloc and mm_free
 void *mm_realloc(void *bp, size_t asize) {
     void *new_bp;
     size_t next_alloc = NEXT_IS_ALLOC(bp);
     size_t prev_alloc = PRE_IS_ALLOC(bp);
     size_t csize = GET_SIZE(HDRP(bp));
+
+    if (asize == 0) {
+        mm_free(bp);
+        return NULL;
+    }
 
     if (asize <= MINBLOCKSIZE - HDR) // Adjust block size to include overhead and alignment reqs.
         asize = MINBLOCKSIZE;
@@ -565,8 +568,6 @@ void *mm_realloc(void *bp, size_t asize) {
         }
     }
 
-
-
     // absorb prev + next, move, no sbrk 
     if (!next_alloc && !prev_alloc) {
         size_t nsize = GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -592,10 +593,6 @@ void *mm_realloc(void *bp, size_t asize) {
         }
     }
     
-
-
-
-
     // absrob prev + next, move, sbrk
     if (!next_alloc && !prev_alloc) {
         size_t nsize = GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -672,7 +669,6 @@ static void mm_checkheap(int lineno) {
         }    
     }
 
-
     // Heap level
     // Prologue/Epilogue blocks are at specific locations (e.g. heap boundaries and have special size/alloc fields)
     // All blocks stay in between the heap boundares
@@ -728,7 +724,6 @@ static void mm_checkheap(int lineno) {
             printf("Free list cycle detected: Line %d\n", lineno);
         }
     }
-
     // Other 
 }
 
@@ -744,15 +739,3 @@ static int loop_detection(char *bp) {
     }
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
