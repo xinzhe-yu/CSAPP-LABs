@@ -4,6 +4,8 @@ A `malloc`/`free`/`realloc` implementation in C using segregated free lists, bou
 coalescing, and a size-aware placement policy. Scores 96/100 on the CS:APP allocator
 benchmark at 93% average utilization.
 
+Source: [`mm.c`](../../Labs/malloclab-handout/malloclab-handout/mm.c)
+
 ## Results
 
 | trace | pattern | utilization |
