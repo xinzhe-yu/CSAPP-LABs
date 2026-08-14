@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 
         setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(int));
 
-        if (bind(listenfd, p->ai_addr, p->ai_addrlen) > 0) {
+        if (bind(listenfd, p->ai_addr, p->ai_addrlen) >= 0) {
             break;
         }
         close(listenfd);
@@ -65,31 +65,25 @@ int main(int argc, char *argv[])
     
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
-    pthread_t tid;
-    int *connfd;
-
+    int connfd;
 
     while (1) {
         clientlen = sizeof(struct sockaddr_storage);
-        connfd = malloc(sizeof(int));
-        *connfd = accept(listenfd, (struct sockaddr *) &clientaddr, &clientlen);
-        Pthread_create(&tid, NULL, thread, connfd);
+        connfd = accept(listenfd, (struct sockaddr *) &clientaddr, &clientlen);
+        if (connfd < 0) { continue; }
+        service(connfd);
+        close(connfd);
     }
+
+
+
     
 
-    /* Thread routine */
-    void *thread(void *vargp) {
-        int connfd = *((int *)vargp);
-        pthread_detach(pthread_self());
-        free(vargp);
-        service(connfd);
-    }
+    
+    
 
 
-
-
-
-
+    
 
     return 0;
 }
