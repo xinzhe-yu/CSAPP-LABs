@@ -69,17 +69,34 @@ int main(int argc, char *argv[])
     
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
-    int connfd;
+    pthread_t tid;
+    int *connfd;
 
     while (1) {
         clientlen = sizeof(struct sockaddr_storage);
-        connfd = accept(listenfd, (struct sockaddr *) &clientaddr, &clientlen);
-        if (connfd < 0) { continue; }
-        service(connfd);
-        close(connfd);
+        connfd = malloc(sizeof(int));
+        if (!connfd) {
+            fprintf(stderr, "Malloc failed\n");
+            continue;
+        }
+        *connfd = accept(listenfd, (struct sockaddr *) &clientaddr, &clientlen);
+        if (*connfd < 0) {
+            free(connfd);
+            continue;
+        }
+        Pthread_create(&tid, NULL, thread, connfd);
     }
-
     return 0;
+}
+
+/* Thread routine */
+void *thread(void *vargp) {
+    int connfd = *((int *)vargp);
+    pthread_detach(pthread_self());
+    free(vargp);
+    service(connfd);
+    close(connfd);
+    return NULL;
 }
 
 void service(int fd) {
