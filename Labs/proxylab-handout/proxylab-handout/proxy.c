@@ -171,10 +171,12 @@ void service(int fd) {
     fflush(stdout);
 
     /* Cache */ 
-    char *buf_out = NULL; 
-    size_t *size_out = NULL; 
-    if (cache_find(request, buf_out, size_out) > 0) { 
-        rio_writen(fd, buf_out, *size_out); // write buf_out and size_out to client; 
+    char cached_buf[MAX_OBJECT_SIZE];
+    size_t cached_size = 0;
+    if (cache_find(request, cached_buf, &cached_size) == 0) { // 0 == hit
+        printf("cache hit (%zu bytes)\n", cached_size);
+        fflush(stdout);
+        rio_writen(fd, cached_buf, cached_size);
         return; 
     } 
 
@@ -213,8 +215,8 @@ void service(int fd) {
         total += n; 
     }
 
-    if (total <= MAX_OBJECT_SIZE) {
-        cache_insert(request, object_buf, &total);
+    if (n == 0 && total > 0 && total <= MAX_OBJECT_SIZE) {
+        cache_insert(request, object_buf, total);
     }
 
     close(serverfd);

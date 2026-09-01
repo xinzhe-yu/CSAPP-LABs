@@ -9,7 +9,7 @@
 
 void cache_init(void);
 int  cache_find(char *uri, char *buf_out, size_t *size_out);
-void cache_insert(char *uri, char *buf, size_t *size);
+void cache_insert(char *uri, char *buf, size_t size);
 void cache_evict(void);
 
 
