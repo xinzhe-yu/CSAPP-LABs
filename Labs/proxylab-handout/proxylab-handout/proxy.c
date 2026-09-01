@@ -5,14 +5,14 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include "csapp.h"
+#include "cache.h"
 
 void *thread(void *vargp); 
 int parse_uri(char *uri, char *host, char *port, char *path);
 void service(int fd);
 
 /* Recommended max cache and object sizes */
-#define MAX_CACHE_SIZE 1049000
-#define MAX_OBJECT_SIZE 102400
+
 //#define LISTENQ 10
 #define PORTLEN 16
 
@@ -71,6 +71,8 @@ int main(int argc, char *argv[])
     struct sockaddr_storage clientaddr;
     pthread_t tid;
     int *connfd;
+
+    cache_init(); 
 
     while (1) {
         clientlen = sizeof(struct sockaddr_storage);
@@ -167,6 +169,15 @@ void service(int fd) {
 
     printf("=== forwarding ===\n%s=== end ===\n", request);
     fflush(stdout);
+
+    /* Cache */ 
+    char *buf_out = NULL; 
+    size_t *size_out = NULL; 
+    if (cache_find(request, buf_out, size_out) > 0) { 
+        rio_writen(fd, buf_out, *size_out); // write buf_out and size_out to client; 
+        return; 
+    } 
+
         
     /* Open new connection */
     int serverfd = open_clientfd(hostname, port);
@@ -187,14 +198,26 @@ void service(int fd) {
     char sbuf[MAXLINE];
     ssize_t n; 
 
+    char object_buf[MAX_OBJECT_SIZE];
+    size_t total = 0;   
+
+    int client_alive = 1;
     rio_readinitb(&sio, serverfd);
     while ((n = rio_readnb(&sio, sbuf, MAXLINE)) > 0) { // Read from server n
-        if (rio_writen(fd, sbuf, n) < 0) break;         // Write to client n 
+        if (client_alive && rio_writen(fd, sbuf, n) < 0) {
+            client_alive = 0;
+        }
+        if (total + n <= MAX_OBJECT_SIZE) {
+            memcpy(object_buf + total, sbuf, n);
+        }
+        total += n; 
+    }
+
+    if (total <= MAX_OBJECT_SIZE) {
+        cache_insert(request, object_buf, &total);
     }
 
     close(serverfd);
-
-
 }
 
     // char *testcase[10] = {
