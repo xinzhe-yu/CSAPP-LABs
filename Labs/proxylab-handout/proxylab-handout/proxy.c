@@ -196,7 +196,7 @@ void service(int fd) {
     }
 
     // New rio to read from connection
-    rio_t sio;
+  
     char sbuf[MAXLINE];
     ssize_t n; 
 
@@ -204,15 +204,18 @@ void service(int fd) {
     size_t total = 0;   
 
     int client_alive = 1;
-    rio_readinitb(&sio, serverfd);
-    while ((n = rio_readnb(&sio, sbuf, MAXLINE)) > 0) { // Read from server n
+
+    while (1) {
+        n = read(serverfd, sbuf, MAXLINE);
+        if (n <= 0) { break; }
+        
         if (client_alive && rio_writen(fd, sbuf, n) < 0) {
             client_alive = 0;
         }
         if (total + n <= MAX_OBJECT_SIZE) {
             memcpy(object_buf + total, sbuf, n);
         }
-        total += n; 
+        total += n;
     }
 
     if (n == 0 && total > 0 && total <= MAX_OBJECT_SIZE) {
