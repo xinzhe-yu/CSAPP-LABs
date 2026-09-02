@@ -73,6 +73,7 @@ void cache_insert(char *uri, char *buf, size_t size) {
     }
     int i = find_empty();
     if (i == -1) {
+        V(&w);
         return; 
     }
     cache[i].data = malloc(size);

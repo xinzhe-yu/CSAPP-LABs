@@ -16,7 +16,7 @@ Deep-dive writeups for each lab.
 | 06 | [Performance Lab](solutions/06_Performance_lab/) | Optimize a kernel for cache locality. | ➕ |
 | 07 | [Shell Lab](solutions/07_Shell_lab/) | A Unix shell with job control and signals. | ✅ |
 | 08 | [Malloc Lab](solutions/08_Malloc_lab/README.md) | A custom malloc/free/realloc allocator. | ✅ |
-| 09 | [Proxy Lab](solutions/09_Proxy_lab/README.md) | A concurrent caching web proxy. | ⬜ |
+| 09 | [Proxy Lab](solutions/09_Proxy_lab/README.md) | A concurrent caching web proxy. | ✅ |
 
 ➕ Saved for later. Not in the [CMU lectures](https://scs.hosted.panopto.com/Panopto/Pages/Sessions/List.aspx#folderID=%22b96d90ae-9871-4fae-91e2-b1627b43e25e%22).
 
